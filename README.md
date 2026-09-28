@@ -99,3 +99,6 @@ npm run build
 ## Security
 
 Only the Supabase publishable key belongs in the browser application. Never expose the Supabase secret/service-role key in GitHub, Netlify public variables, or client-side code.
+
+## Branding assets
+The GEAEMS logo is included in this build. The portal uses it for the login screen and sidebar, and generated square derivatives are included for the favicon, Apple touch icon, and installable web-app manifest. No manual logo copy step is required.
