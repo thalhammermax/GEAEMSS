@@ -1,57 +1,101 @@
-# GEAEMS Portal
+# GEAEMS Portal v0.2
 
-Initial live frontend for the Greater Elgin Area EMS System personnel and fleet compliance system.
+Greater Elgin Area EMS System personnel, credential, fleet, licensing and inspection compliance portal.
 
-Production target: `https://portal.geaemss.org`
+Production URL: `https://portal.geaemss.org`
 
-## Included now
+## v0.2 includes
 
-- Supabase email/password login
-- Cookie-based Supabase SSR authentication for Next.js 16
-- Row-Level-Security-aware data access (no service-role key in the browser)
-- Protected portal shell
-- System Admin dashboard with live counts
-- Personnel registry view
-- Credential configuration/summary view
-- Fleet registry view
-- Inspection history view
-- Report catalog placeholder
-- Administration summary
-- Original initial Supabase migration for source control
+- Supabase email/password authentication with Next.js SSR
+- RLS-aware System Admin / Agency Admin / Provider data access foundation
+- System dashboard with live database counts
+- Agency create/edit/inactivate workflow
+- Personnel registry with search and agency/level/status filters
+- Provider create/edit pages
+- Multiple agency affiliations per provider
+- Provider profile with credential summary
+- Fleet registry with search and filters
+- Vehicle create/edit/inactivate workflow
+- Configurable built-in fields for Personnel, Agencies and Vehicles
+- Custom fields for Personnel, Agencies and Vehicles
+  - Text
+  - Long text
+  - Number
+  - Date
+  - Yes/No
+  - Email
+  - Phone
+  - URL
+  - Dropdown
+  - Multi-select
+- Custom field values protected by the same RLS model as their parent records
+- Audit logging for field-definition and custom-value changes
+- Official GEAEMS logo hooks for portal branding, favicon and installable-app icon
 
-Create/edit functions are intentionally disabled in this first UI milestone. The next phase is CRUD forms, provider detail pages, agency management, credential submission/verification, and vehicle/inspection workflows.
+Credential-entry/renewal workflows, automated alerts, report export, vehicle licensing entry and inspection entry are subsequent builds. The underlying database tables for those modules are already present from migration 001.
 
-## Local run
+## IMPORTANT: run migration 002
 
-The supplied archive contains a local `.env.local` using the publishable Supabase values supplied for this project. `.env.local` is ignored by Git.
+Migration `001_initial_schema.sql` has already been run for this project.
+
+Before deploying this version, run the complete contents of:
+
+`supabase/migrations/002_record_fields_and_personnel_admin.sql`
+
+in **Supabase → SQL Editor**.
+
+Migration 002 adds configurable/custom record fields and the controlled provider-creation RPC used by agency personnel administrators.
+
+## Official GEAEMS logo
+
+The app expects the official logo at:
+
+`public/geaems-logo.png`
+
+The supplied logo should be saved to that path in GitHub. It is then used automatically for:
+
+- Login screen
+- Portal sidebar
+- Browser favicon
+- Apple touch icon
+- Web-app manifest icons
+
+The UI contains a small fallback mark so a missing logo file will not prevent the portal from loading.
+
+## Netlify environment variables
+
+Configure these in Netlify rather than committing `.env.local`:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+
+Then redeploy.
+
+## Supabase Auth URL configuration
+
+- Site URL: `https://portal.geaemss.org`
+- Redirect URL: `https://portal.geaemss.org/**`
+- Development: `http://localhost:3000/**`
+
+## Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Then open `http://localhost:3000` and sign in with the Supabase Auth user you created.
+Type check:
 
-## Netlify deployment
+```bash
+npm run typecheck
+```
 
-1. Push this project to GitHub.
-2. In Netlify, add a new project from that repository.
-3. Netlify should detect Next.js automatically.
-4. Add these environment variables in Netlify:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-5. Deploy.
-6. Add `portal.geaemss.org` as the custom domain in Netlify.
-7. Point the DNS record Netlify requests from `geaemss.org` to the Netlify site.
+Production build:
 
-## Supabase Auth URL configuration
-
-Before production login flows are used, set the Supabase Authentication URL settings to include:
-
-- Site URL: `https://portal.geaemss.org`
-- Redirect URL: `https://portal.geaemss.org/**`
-- During development also allow `http://localhost:3000/**`
+```bash
+npm run build
+```
 
 ## Security
 
-This frontend uses only the Supabase publishable key. Never add a `service_role` key or secret API key to `NEXT_PUBLIC_*` variables or client-side code.
+Only the Supabase publishable key belongs in the browser application. Never expose the Supabase secret/service-role key in GitHub, Netlify public variables, or client-side code.

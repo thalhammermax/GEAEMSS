@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/sidebar'
 import { LogoutButton } from '@/components/logout-button'
+import { BrandLogo } from '@/components/brand-logo'
 
 export default async function PortalLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
@@ -19,7 +20,7 @@ export default async function PortalLayout({ children }: { children: ReactNode }
 
   return <div className="portal-shell">
     <aside className="sidebar">
-      <div className="sidebar-brand"><div className="brand-mark">GE</div><div><strong>GEAEMS</strong><span>System Portal</span></div></div>
+      <div className="sidebar-brand"><BrandLogo size="small" /><div><strong>GEAEMS</strong><span>System Portal</span></div></div>
       <Sidebar />
       <div className="sidebar-bottom"><div className="user-card"><div className="user-avatar">{(profile?.display_name || user.email || 'U').slice(0, 1).toUpperCase()}</div><div><strong>{profile?.display_name || user.email}</strong><span>{roleLabel}</span></div></div><LogoutButton /></div>
     </aside>

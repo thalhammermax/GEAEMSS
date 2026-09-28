@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { BrandLogo } from '@/components/brand-logo'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -28,7 +29,7 @@ export default function LoginPage() {
 
   return <main className="login-page">
     <section className="login-panel">
-      <div className="brand-mark large">GE</div>
+      <BrandLogo size="large" />
       <div className="login-heading">
         <p className="eyebrow">Greater Elgin Area EMS System</p>
         <h1>GEAEMS Portal</h1>
