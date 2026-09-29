@@ -1,84 +1,71 @@
-# GEAEMS Portal v0.4
+# GEAEMS Portal v0.5
 
-Credential ownership and requirement scoping.
+GEAEMS System personnel, credential, fleet, and digital vehicle inspection portal.
 
-## Required Supabase step
+Production URL: `https://portal.geaemss.org`
 
-Run **only** this new migration after migrations 001–004:
+## v0.5 — Digital Inspections
 
-`supabase/migrations/005_credential_scope_and_requirements.sql`
+v0.5 turns the Inspections module into an inspection workflow rather than a history-only screen.
 
-Do not rerun 001–004 if they are already applied.
+### Included inspection profiles
 
-## Credential model
+The supplied `gea-idph-ems-comparison-matrix.xlsx` is included under `docs/` and is seeded into versioned digital forms for:
 
-GEAEMS Portal now separates two concepts:
+- GEA BLS Non-Transport — 81 applicable checklist items
+- GEA BLS Ambulance — 94 applicable checklist items
+- GEA ALS Non-Transport — 118 applicable checklist items
+- GEA ALS Ambulance — 135 applicable checklist items
+- GEA Critical Care Transport — 144 applicable checklist items
 
-1. **Credential definition ownership**
-   - **GEAEMS System credential** — created/owned by System Administration and visible system-wide.
-   - **Agency credential** — created/owned by one participating agency and available only in that agency's credential context.
+The source matrix contains 147 unique line items in 11 sections. Items marked `N/A` for a vehicle profile are omitted from that vehicle's inspection form. Exact requirement text from the matrix (quantity, sets, sizes, medication totals, `Required`, etc.) is displayed next to each checklist item.
 
-2. **Credential requirements**
-   - **System requirement** — may be created only by a System Administrator and can apply to all active providers or one provider level.
-   - **Agency requirement** — applies only to active providers affiliated with that agency and can apply to all provider levels or one provider level.
+### Inspector workflow
 
-A System credential can also be required by an individual agency. This avoids duplicate definitions. For example, GEAEMS may define `PALS` once while one agency independently requires PALS for a provider group.
+1. Open **Inspections**.
+2. Select **Start inspection**.
+3. Select a vehicle.
+4. The portal loads the published form that matches the vehicle's type.
+5. For each applicable item, mark **Compliant** or **Deficient**, with optional observed/count and notes.
+6. Use **Mark section compliant** to speed up a section.
+7. Save an incomplete inspection as a draft and resume it later.
+8. Submit the inspection when every required line item has a disposition.
+9. Failed line items automatically become vehicle deficiencies.
+10. Submitted inspections are locked for normal agency editing and remain historical records against the exact form version used.
 
-An agency-owned credential can only be required by its owning agency.
+### Vehicle types
 
-## Access rules
+Migration 006 adds the five specific matrix vehicle types while leaving existing generic fleet types intact. Vehicles that need digital matrix inspections should use one of these five types. A generic vehicle type will show that no inspection form is assigned.
 
-### System Administrator
+### Versioning
 
-- Create/edit/retire System credential definitions.
-- Create/edit/retire agency credential definitions.
-- Add System-wide requirements.
-- Add or remove agency requirements.
-- View compliance across the entire system.
+Inspection forms are versioned. Completed inspections reference the exact form version and exact line-item definitions used at the time of inspection. Future edits to a template will therefore not rewrite historic inspections.
 
-### Agency Administrator with Credential permission
+The schema supports both System-owned and Agency-owned inspection templates, although v0.5 ships the supplied matrix as GEAEMS System templates. A visual template editor can be added later without redesigning completed-inspection storage.
 
-- View GEAEMS System credential definitions.
-- Create/edit/retire credential definitions owned by an assigned agency.
-- Add/remove requirements for an assigned agency.
-- Use a GEAEMS System credential as an agency-specific requirement without duplicating it.
-- Cannot edit a System credential definition.
-- Cannot see another agency's private credential definitions or private credential records.
+## Deploying v0.5
 
-### Provider
+Your database should already have migrations `001` through `005` applied.
 
-- Still has self-service access only.
-- Sees credential requirements that apply to the provider through GEAEMS or an active agency affiliation.
-- Sees only their own credential records.
+Run only:
 
-## Compliance behavior
+```text
+supabase/migrations/006_digital_vehicle_inspections.sql
+```
 
-A requirement with no provider level selected means **all active providers in that scope**.
+in **Supabase → SQL Editor**.
 
-Examples:
-
-- `Illinois Paramedic License` → GEAEMS System → Paramedic = required for all active Paramedics system-wide.
-- `BLS` → GEAEMS System → All provider levels = required for every active GEAEMS provider.
-- `Driver Authorization` → Agency A → All provider levels = required for every active provider affiliated with Agency A.
-- `PALS` → Agency B → Paramedic = a local requirement using the System-defined PALS credential.
-
-The compliance view now excludes provider statuses configured not to count toward compliance and uses an agency-specific provider level when one is assigned on an agency affiliation.
-
-## UI changes
-
-- Credentials are split into **System credentials** and **Agency credentials**.
-- Add Credential now asks who owns the credential.
-- Credential detail pages now include a **Who is required to maintain this credential?** section.
-- System credentials are read-only to Agency Administrators, but authorized Agency Administrators may add a local requirement.
-- Provider and self-service profiles now show required credential compliance, including **Missing**, **Expired**, **Expiring soon**, and **Current**.
-
-## Deployment
-
-1. Run `005_credential_scope_and_requirements.sql` in Supabase SQL Editor.
-2. Replace the GitHub repository contents with this version.
-3. Push to your production branch and allow Netlify to rebuild.
-4. Test first as a System Administrator.
-5. Test with an Agency Administrator that has `Credentials` permission for one agency.
-6. Test with a provider-only account affiliated with that agency.
+Then push the v0.5 application files to GitHub and allow Netlify to rebuild.
 
 No new Netlify environment variables are required.
+
+## Existing environment variables
+
+```text
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SECRET_KEY
+NEXT_PUBLIC_SITE_URL=https://portal.geaemss.org
+```
+
+Never commit the Supabase secret key to GitHub.

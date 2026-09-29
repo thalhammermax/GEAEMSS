@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
@@ -60,6 +61,7 @@ export default async function VehiclePage({ params, searchParams }: Props) {
       <section className="panel">
         <div className="panel-heading"><h3>Record status</h3><span>Archive without deleting history</span></div>
         <p className="panel-copy">Inactivating a vehicle keeps licensing, inspection and audit history intact while removing it from normal active-fleet workflows.</p>
+        {vehicle.active && <p><Link className="primary-button small button-link" href={`/inspections/new?vehicle=${vehicle.id}`}>Start inspection</Link></p>}
         <form action={setVehicleActive}>
           <input type="hidden" name="id" value={vehicle.id} />
           <input type="hidden" name="active" value={vehicle.active ? 'false' : 'true'} />
