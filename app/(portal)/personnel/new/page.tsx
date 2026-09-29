@@ -44,6 +44,11 @@ export default async function NewProviderPage({ searchParams }: Props) {
 
       <CustomFieldInputs fields={custom} />
 
+      <div className="form-section-divider"><span>Portal account</span></div>
+      <div className="account-invite-option">
+        <label className="checkbox-field"><input name="send_account_invite" type="checkbox" /><span><strong>Email this provider a portal account setup link</strong><small>Optional and off by default. The provider's email address will be their login username. You can send the invitation later from Administration → User Management.</small></span></label>
+      </div>
+
       <div className="form-section-divider"><span>Primary agency affiliation</span></div>
       <div className="form-grid three">
         <label className="field"><span>Agency *</span><select name="agency_id" required defaultValue=""><option value="" disabled>Select agency</option>{agencies?.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>

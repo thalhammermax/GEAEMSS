@@ -251,3 +251,28 @@ td strong { color: var(--navy); }
 .admin-card p { color: var(--muted); font-size: 11px; line-height: 1.55; }
 .admin-card b { margin-top: auto; color: #225f91; font-size: 11px; }
 @media (max-width: 850px) { .admin-card-grid { grid-template-columns: 1fr; } .fleet-filter { grid-template-columns: 1fr; } }
+
+/* v0.3 credential and user administration */
+.danger-zone { border-color: #ebc8cb; }
+.field-button { justify-content: end; }
+.account-invite-option { background: #f7f9fb; border: 1px solid #e3e9ee; border-radius: 9px; padding: 14px 15px; }
+.account-invite-option .checkbox-field span { display: flex; flex-direction: column; gap: 3px; }
+.account-invite-option .checkbox-field strong { color: var(--navy); font-size: 12px; }
+.account-invite-option .checkbox-field small { color: var(--muted); line-height: 1.45; }
+.role-option-list { display: grid; gap: 10px; }
+.role-option-list > label { display: flex; gap: 10px; align-items: flex-start; padding: 11px 12px; border: 1px solid #e2e8ed; border-radius: 8px; }
+.role-option-list > label input { margin-top: 3px; accent-color: var(--navy-3); }
+.role-option-list span { display: flex; flex-direction: column; gap: 3px; }
+.role-option-list strong { color: var(--navy); font-size: 12px; }
+.role-option-list small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.split-actions { justify-content: space-between; flex-wrap: wrap; }
+.agency-permission-list { display: grid; }
+.agency-permission-row { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(3, 130px) auto; gap: 12px; align-items: center; padding: 12px 16px; border-top: 1px solid #edf0f3; }
+.agency-permission-row:first-child { border-top: 0; }
+.agency-access-name { display: flex; align-items: center; gap: 9px; }
+.agency-access-name input { accent-color: var(--navy-3); }
+.agency-access-name span { display: flex; flex-direction: column; gap: 2px; }
+.agency-access-name strong { color: var(--navy); font-size: 12px; }
+.agency-access-name small { color: var(--muted); font-size: 9px; }
+@media (max-width: 1050px) { .agency-permission-row { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px) { .agency-permission-row { grid-template-columns: 1fr; } }

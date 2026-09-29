@@ -11,9 +11,11 @@ export default async function PortalLayout({ children }: { children: ReactNode }
   if (!user) redirect('/login')
 
   const [{ data: profile }, { data: roles }] = await Promise.all([
-    supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle(),
+    supabase.from('profiles').select('display_name, active').eq('id', user.id).maybeSingle(),
     supabase.from('user_roles').select('role').eq('user_id', user.id),
   ])
+
+  if (!profile || profile.active === false) redirect('/auth/disabled')
 
   const roleNames = (roles ?? []).map((r: { role: string }) => r.role)
   const roleLabel = roleNames.includes('system_admin') ? 'System Administrator' : roleNames.includes('agency_admin') ? 'Agency Administrator' : 'Provider'

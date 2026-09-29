@@ -7,7 +7,7 @@ import { formatDate } from '@/lib/format'
 import { addAffiliation, endAffiliation, setPrimaryAffiliation } from '../actions'
 
 export const metadata: Metadata = { title: 'Provider Profile' }
-type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; saved?: string }> }
+type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; saved?: string; inviteSent?: string; inviteError?: string }> }
 
 function credentialState(expiration: string | null) {
   if (!expiration) return { label: 'Current', className: 'green' }
@@ -41,6 +41,8 @@ export default async function ProviderPage({ params, searchParams }: Props) {
   return <>
     <PageHeader eyebrow="Personnel" title={`${provider.first_name} ${provider.last_name}`} description={`${provider.provider_levels?.name ?? 'Provider'} · ${provider.provider_number || 'No system ID assigned'}`} action={<Link className="primary-button small button-link" href={`/personnel/${provider.id}/edit`}>Edit provider</Link>} />
     {qs.saved && <div className="banner success"><div><strong>Saved</strong><span>The provider record was updated.</span></div></div>}
+    {qs.inviteSent && <div className="banner success"><div><strong>Account setup email sent</strong><span>The provider can use the link in the email to create a password. Their email address is their login username.</span></div></div>}
+    {qs.inviteError && <div className="banner danger"><div><strong>Provider created, but account invitation failed</strong><span>{qs.inviteError}</span></div></div>}
     {qs.error && <div className="banner danger"><div><strong>Unable to save</strong><span>{qs.error}</span></div></div>}
 
     <div className="profile-grid">

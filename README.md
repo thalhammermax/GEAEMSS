@@ -1,81 +1,113 @@
-# GEAEMS Portal v0.2
+# GEAEMS Portal v0.3
 
 Greater Elgin Area EMS System personnel, credential, fleet, licensing and inspection compliance portal.
 
 Production URL: `https://portal.geaemss.org`
 
-## v0.2 includes
+## v0.3 adds
 
-- Supabase email/password authentication with Next.js SSR
-- RLS-aware System Admin / Agency Admin / Provider data access foundation
-- System dashboard with live database counts
-- Agency create/edit/inactivate workflow
-- Personnel registry with search and agency/level/status filters
-- Provider create/edit pages
-- Multiple agency affiliations per provider
-- Provider profile with credential summary
-- Fleet registry with search and filters
-- Vehicle create/edit/inactivate workflow
-- Configurable built-in fields for Personnel, Agencies and Vehicles
-- Custom fields for Personnel, Agencies and Vehicles
-  - Text
-  - Long text
-  - Number
-  - Date
-  - Yes/No
-  - Email
-  - Phone
-  - URL
-  - Dropdown
-  - Multi-select
-- Custom field values protected by the same RLS model as their parent records
-- Audit logging for field-definition and custom-value changes
-- Official GEAEMS logo hooks for portal branding, favicon and installable-app icon
+### Credential administration
+- Create credential types
+- Edit credential types
+- Activate/deactivate credential types
+- Permanently delete unused credential types
+- If a credential type has requirements, provider history, or submissions, a delete request safely deactivates it instead of destroying compliance history
+- Configure credential category, renewal interval, required fields, verification, documents, and warning thresholds
 
-Credential-entry/renewal workflows, automated alerts, report export, vehicle licensing entry and inspection entry are subsequent builds. The underlying database tables for those modules are already present from migration 001.
+### User management
+- Administration → User Management
+- View Supabase Auth users from inside the portal
+- Link provider records to portal accounts
+- Provider email address is the login username
+- Send provider account setup invitations
+- Send password setup/reset emails later
+- Enable/disable portal access
+- Manage Provider, Agency Administrator, and System Administrator roles
+- Assign Agency Administrator permissions by agency for Personnel, Credentials, and Fleet
+- Prevent a System Administrator from disabling their own account or removing their own System Administrator role
 
-## IMPORTANT: run migration 002
+### Provider creation
+- New optional checkbox: **Email this provider a portal account setup link**
+- The checkbox is OFF by default
+- If left off, the provider record is created with no login account
+- The account can be invited later from Administration → User Management
+- If selected, the provider must have an email address and that email becomes the login username
 
-Migration `001_initial_schema.sql` has already been run for this project.
+### Account setup
+- Invited users are sent to `/auth/setup-password`
+- The user sets their own password; administrators do not set or see it
+- Disabled profiles are blocked from administrative RLS access as well as from portal pages
 
-Before deploying this version, run the complete contents of:
+v0.2 features remain: agency management, personnel registry, multi-agency affiliations, fleet registry, configurable built-in fields, custom fields, GEAEMS branding, and the original compliance schema.
 
-`supabase/migrations/002_record_fields_and_personnel_admin.sql`
+## IMPORTANT: run migration 003
+
+You have already run migrations 001 and 002.
+
+Before using the user enable/disable controls, run the complete contents of:
+
+`supabase/migrations/003_user_account_security.sql`
 
 in **Supabase → SQL Editor**.
 
-Migration 002 adds configurable/custom record fields and the controlled provider-creation RPC used by agency personnel administrators.
+Migration 003 makes `profiles.active` authoritative for System Administrator and Agency Administrator RLS access.
 
-## Official GEAEMS logo
+## Required Netlify environment variables
 
-The app expects the official logo at:
-
-`public/geaems-logo.png`
-
-The supplied logo should be saved to that path in GitHub. It is then used automatically for:
-
-- Login screen
-- Portal sidebar
-- Browser favicon
-- Apple touch icon
-- Web-app manifest icons
-
-The UI contains a small fallback mark so a missing logo file will not prevent the portal from loading.
-
-## Netlify environment variables
-
-Configure these in Netlify rather than committing `.env.local`:
+The existing browser-safe variables remain:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
-Then redeploy.
+For v0.3 User Management, add this **server-only** variable in Netlify:
+
+- `SUPABASE_SECRET_KEY`
+
+Use the Supabase **secret** key (`sb_secret_...`) from Project Settings → API Keys. Do not prefix it with `NEXT_PUBLIC_`, do not commit it to GitHub, and do not paste it into client-side code.
+
+For projects still using the legacy key, the build also accepts:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Do not configure both unless you have a reason to; prefer `SUPABASE_SECRET_KEY` for new projects.
+
+Recommended production variable:
+
+- `NEXT_PUBLIC_SITE_URL=https://portal.geaemss.org`
+
+The code defaults to that production URL if the variable is absent.
+
+After adding/changing Netlify variables, use **Clear cache and deploy site**.
 
 ## Supabase Auth URL configuration
+
+Keep:
 
 - Site URL: `https://portal.geaemss.org`
 - Redirect URL: `https://portal.geaemss.org/**`
 - Development: `http://localhost:3000/**`
+
+The wildcard production redirect covers the new `/auth/setup-password` route.
+
+## Invitation behavior
+
+Supabase's invitation API is called only from server-side code. When the optional provider invitation is used:
+
+1. Provider record is created.
+2. Supabase Auth creates/invites the user at the provider email address.
+3. The Auth user is linked to the provider through `public.profiles`.
+4. The user receives the Provider role.
+5. The email link sends them to the password setup page.
+
+If the provider record succeeds but the email invitation fails, the provider is retained and the portal shows the invitation error. An administrator can retry from User Management.
+
+## Existing provider records
+
+You do **not** need to create login accounts for all providers. This is intentional. Import all personnel first if desired, then invite only the users who need portal access.
+
+## Email sending limits
+
+Supabase's built-in email service is suitable for development and low-volume individual invitations, but it has sending restrictions. Before a large rollout to hundreds of providers, configure custom SMTP (for example Resend or another organizational mail service) in Supabase Auth.
 
 ## Development
 
@@ -98,7 +130,4 @@ npm run build
 
 ## Security
 
-Only the Supabase publishable key belongs in the browser application. Never expose the Supabase secret/service-role key in GitHub, Netlify public variables, or client-side code.
-
-## Branding assets
-The GEAEMS logo is included in this build. The portal uses it for the login screen and sidebar, and generated square derivatives are included for the favicon, Apple touch icon, and installable web-app manifest. No manual logo copy step is required.
+The Supabase publishable key is browser-safe and is used by the normal portal client. The Supabase secret/service-role key bypasses Row Level Security and is used only in server-side User Management functions. Never expose it in browser code, public environment variables, or GitHub.

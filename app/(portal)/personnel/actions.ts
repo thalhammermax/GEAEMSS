@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { builtinFieldMap, fetchFieldDefinitions, isEnabled, isRequired, saveCustomFieldValues, validateCustomFieldValues } from '@/lib/record-fields'
+import { inviteProviderAccount } from '@/lib/user-accounts'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 function textValue(formData: FormData, key: string) {
   const value = formData.get(key)
@@ -45,6 +47,8 @@ export async function createProvider(formData: FormData) {
   const customValidation = await validateCustomFieldValues(supabase, 'provider', formData)
   if (customValidation) fail('/personnel/new', customValidation)
   const payload = await providerPayload(supabase, formData, '/personnel/new')
+  const sendInvite = formData.get('send_account_invite') === 'on'
+  if (sendInvite && !payload.email) fail('/personnel/new', 'An email address is required when sending a portal account setup link.')
 
   const { data: providerId, error: providerError } = await supabase.rpc('create_provider_with_primary_agency', {
     p_agency_id: agencyId,
@@ -60,10 +64,21 @@ export async function createProvider(formData: FormData) {
   const customError = await saveCustomFieldValues(supabase, 'provider', providerId, formData)
   if (customError) fail(`/personnel/${providerId}/edit`, `Provider was created, but custom fields could not be saved: ${customError}`)
 
+  let inviteResult = ''
+  if (sendInvite) {
+    try {
+      await inviteProviderAccount(providerId)
+      inviteResult = '&inviteSent=1'
+    } catch (error: any) {
+      inviteResult = `&inviteError=${encodeURIComponent(error?.message ?? 'The provider was created, but the account setup email could not be sent.')}`
+    }
+  }
+
   revalidatePath('/personnel')
   revalidatePath('/dashboard')
   revalidatePath('/administration/agencies')
-  redirect(`/personnel/${providerId}?saved=1`)
+  revalidatePath('/administration/users')
+  redirect(`/personnel/${providerId}?saved=1${inviteResult}`)
 }
 
 export async function updateProvider(formData: FormData) {
@@ -75,9 +90,27 @@ export async function updateProvider(formData: FormData) {
   const customValidation = await validateCustomFieldValues(supabase, 'provider', formData)
   if (customValidation) fail(path, customValidation)
   const payload = await providerPayload(supabase, formData, path)
+  const { data: currentProvider, error: currentError } = await supabase.from('providers').select('email').eq('id', id).maybeSingle()
+  if (currentError || !currentProvider) fail(path, currentError?.message ?? 'Provider could not be loaded.')
 
   const { error } = await supabase.from('providers').update(payload).eq('id', id)
   if (error) fail(path, error.message)
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'email') && payload.email !== currentProvider.email) {
+    try {
+      const admin = createAdminClient()
+      const { data: linkedProfile, error: linkedError } = await admin.from('profiles').select('id').eq('provider_id', id).maybeSingle()
+      if (linkedError) throw linkedError
+      if (linkedProfile) {
+        if (!payload.email) throw new Error('A provider with a portal account must retain an email address because the email is the login username.')
+        const { error: authError } = await admin.auth.admin.updateUserById(linkedProfile.id, { email: payload.email })
+        if (authError) throw authError
+      }
+    } catch (syncError: any) {
+      await supabase.from('providers').update({ email: currentProvider.email }).eq('id', id)
+      fail(path, `Email was not changed because the linked login could not be updated: ${syncError?.message ?? 'Unknown error'}`)
+    }
+  }
 
   const customError = await saveCustomFieldValues(supabase, 'provider', id, formData)
   if (customError) fail(path, customError)
