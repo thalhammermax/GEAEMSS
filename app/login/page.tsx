@@ -9,6 +9,7 @@ function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const notice = searchParams.get('notice')
+  const linkError = searchParams.get('error')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -41,6 +42,7 @@ function LoginContent() {
         <label>Email address<input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
         <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
         {notice && <div className="form-success">{notice}</div>}
+        {linkError && <div className="form-error">{linkError}</div>}
         {error && <div className="form-error">{error}</div>}
         <button className="primary-button" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
       </form>
