@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { formatDate, titleCase } from '@/lib/format'
@@ -19,13 +20,16 @@ export default async function InspectionsPage() {
   const isSystemAdmin = roleNames.has('system_admin')
   const isSystemInspector = roleNames.has('system_inspector')
   const isAgencyAdmin = roleNames.has('agency_admin')
+  if (!isSystemAdmin && !isSystemInspector && !isAgencyAdmin) redirect('/my-profile')
+  const canManageForms = isSystemAdmin || (isAgencyAdmin && (accessRows ?? []).some((a:any) => a.can_manage_fleet))
+  const canStartInspection = isSystemAdmin || isSystemInspector || (isAgencyAdmin && (accessRows ?? []).some((a:any) => a.can_manage_fleet))
   const rows = (inspections ?? []) as any[]
   const drafts = rows.filter((r)=>r.workflow_status === 'draft').length
   const submitted = rows.filter((r)=>r.workflow_status === 'submitted').length
   const failed = rows.filter((r)=>['failed','out_of_service'].includes(r.result)).length
 
   return <>
-    <PageHeader title="Inspections" description="Perform GEAEMS vehicle inspections, resume drafts, review results and track deficiencies." action={<Link className="primary-button small button-link" href="/inspections/new">Start inspection</Link>} />
+    <PageHeader title="Inspections" description="Perform GEAEMS vehicle inspections, resume authorized drafts, review submitted results and track deficiencies." action={<div className="inline-actions">{canManageForms && <Link className="secondary-button small button-link" href="/inspections/forms">Manage forms</Link>}{canStartInspection && <Link className="primary-button small button-link" href="/inspections/new">Start inspection</Link>}</div>} />
     <div className="summary-strip"><div><span>Recent records</span><strong>{rows.length}</strong></div><div><span>Drafts</span><strong>{drafts}</strong></div><div><span>Submitted</span><strong>{submitted}</strong></div><div><span>Failed / OOS</span><strong>{failed}</strong></div><div><span>Open deficiencies</span><strong>{deficiencies?.length ?? 0}</strong></div></div>
     {(deficiencies?.length ?? 0) > 0 && <div className="banner warning"><div><strong>{deficiencies?.length} open deficiencies</strong><span>Corrective-action tracking is active for submitted inspections.</span></div></div>}
     <div className="table-card">{error ? <div className="empty-state danger-text">{error.message}</div> : rows.length === 0 ? <div className="empty-state"><strong>No inspection records yet</strong><span>Choose Start inspection to perform the first digital vehicle inspection.</span></div> : <table><thead><tr><th>Date</th><th>Unit</th><th>Inspection</th><th>Status</th><th>Next due</th><th>Inspector</th><th></th></tr></thead><tbody>{rows.map((r) => {

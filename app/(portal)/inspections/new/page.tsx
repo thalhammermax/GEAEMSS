@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { DigitalInspectionForm } from '@/components/digital-inspection-form'
@@ -19,6 +20,8 @@ export default async function StartInspectionPage({ searchParams }: Props) {
   const roleNames = new Set((roles ?? []).map((r:any)=>r.role))
   const isSystemAdmin = roleNames.has('system_admin')
   const isSystemInspector = roleNames.has('system_inspector')
+  const isAgencyAdmin = roleNames.has('agency_admin')
+  if (!isSystemAdmin && !isSystemInspector && !isAgencyAdmin) redirect('/my-profile')
   const canPerformSystemInspection = isSystemAdmin || isSystemInspector
   const manageableAgencyIds = (accessRows ?? []).filter((r:any)=>r.can_manage_fleet).map((r:any)=>r.agency_id)
 
@@ -52,7 +55,7 @@ export default async function StartInspectionPage({ searchParams }: Props) {
   const formVersion = versions?.[0]
   if (!formVersion) return <div className="empty-state"><strong>No published form version</strong><span>System Administration must publish an inspection form before it can be performed.</span></div>
 
-  const { data: sections } = await supabase.from('inspection_form_sections').select('id, title, sort_order, inspection_form_items(id, label, requirement_text, allow_na, required, sort_order)').eq('form_version_id', formVersion.id).order('sort_order')
+  const { data: sections } = await supabase.from('inspection_form_sections').select('id, title, sort_order, inspection_form_items(id, label, requirement_text, response_type, allow_na, required, sort_order)').eq('form_version_id', formVersion.id).order('sort_order')
 
   return <>
     <PageHeader eyebrow={template.scope_type === 'system' ? 'GEAEMS System Inspection' : 'Agency Inspection'} title={`Inspect ${vehicle.unit_number || vehicle.fleet_number || 'vehicle'}`} description={`${vehicle.agencies?.name || ''} · ${vehicle.vehicle_types?.name || ''}`} />

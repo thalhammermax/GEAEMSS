@@ -18,7 +18,7 @@ type Props = {
 export function DigitalInspectionForm({ inspectionId, vehicle, template, formVersion, sections, responses = [], defaults = {}, readOnly = false }: Props) {
   const responseMap = Object.fromEntries(responses.map((r: any) => [r.form_item_id, r]))
   const itemCount = sections.reduce((n, s) => n + (s.inspection_form_items?.length ?? 0), 0)
-  const answeredCount = responses.filter((r: any) => r.status).length
+  const answeredCount = responses.filter((r: any) => r.status || r.observed_value).length
   const failedCount = responses.filter((r: any) => r.status === 'fail').length
 
   return <>

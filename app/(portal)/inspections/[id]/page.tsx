@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { DigitalInspectionForm } from '@/components/digital-inspection-form'
@@ -22,6 +22,7 @@ export default async function InspectionPage({ params, searchParams }: Props) {
   const isSystemAdmin = roleNames.has('system_admin')
   const isSystemInspector = roleNames.has('system_inspector')
   const isAgencyAdmin = roleNames.has('agency_admin')
+  if (!isSystemAdmin && !isSystemInspector && !isAgencyAdmin) redirect('/my-profile')
 
   const { data: inspection, error } = await supabase.from('vehicle_inspections').select('*, vehicles(id, agency_id, vehicle_type_id, unit_number, fleet_number, year, make, model, agencies(name, short_name), vehicle_types(name, code)), inspection_types(name)').eq('id', id).maybeSingle()
   if (error || !inspection) notFound()
@@ -43,7 +44,7 @@ export default async function InspectionPage({ params, searchParams }: Props) {
   if (!formVersion) notFound()
   const [{ data: template }, { data: sections }] = await Promise.all([
     supabase.from('inspection_form_templates').select('id, code, name, scope_type, agency_id, vehicle_type_id').eq('id', formVersion.template_id).maybeSingle(),
-    supabase.from('inspection_form_sections').select('id, title, sort_order, inspection_form_items(id, label, requirement_text, allow_na, required, sort_order)').eq('form_version_id', formVersion.id).order('sort_order'),
+    supabase.from('inspection_form_sections').select('id, title, sort_order, inspection_form_items(id, label, requirement_text, response_type, allow_na, required, sort_order)').eq('form_version_id', formVersion.id).order('sort_order'),
   ])
   if (!template) notFound()
 

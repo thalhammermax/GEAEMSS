@@ -1,8 +1,40 @@
-# GEAEMS Portal v0.6
+# GEAEMS Portal v0.6.1
 
 Production URL: `https://portal.geaemss.org`
 
-v0.6 adds a full **Narcotics Management** module to the existing personnel, credential, fleet, and digital inspection portal.
+v0.6.1 keeps the v0.6 Narcotics Management module and adds a **versioned Inspection Form Editor** plus stricter privacy for in-progress inspection drafts.
+
+## Inspection form editor
+
+Go to:
+
+**Inspections → Manage forms**
+
+System Administrators can edit GEAEMS System inspection forms. Agency Administrators with Fleet management permission may edit agency-owned forms. System Inspectors can perform System inspections but cannot change form definitions.
+
+Published forms are immutable. Selecting an inspection form and choosing **Create editable draft** clones the current published checklist into a new draft version. In that draft you can:
+
+- rename sections and change their order;
+- add or delete sections;
+- add, edit, or delete inspection items;
+- change requirement text;
+- change item ordering;
+- choose required/optional status;
+- allow N/A responses where appropriate;
+- set failure severity and require deficiency comments;
+- use Compliance, Text, Number, Date, or Yes/No response types.
+
+Publishing the draft retires the previous published version for future inspections. Existing historical inspections remain permanently tied to the version that was used when they were performed.
+
+## Draft inspection privacy
+
+GEAEMS **System inspection drafts** are now returned only to:
+
+- System Inspectors; and
+- System Administrators.
+
+Agency Administrators do not receive in-progress System inspections in inspection-list queries and cannot open them directly. Once a System inspection is submitted, normal agency inspection-history access applies. Agency-owned form drafts remain available only to the agency users authorized to perform those agency inspections.
+
 
 ## Daily narcotics counts
 
@@ -91,19 +123,19 @@ SUPABASE_SECRET_KEY
 
 Ensure those variables and `RESEND_API_KEY` are available to Netlify Functions at runtime.
 
-## Deploying v0.6
+## Deploying v0.6.1
 
-Your project should already have migrations `001` through `007` applied.
+Your project should already have migrations `001` through `008` applied.
 
 Run only:
 
 ```text
-supabase/migrations/008_narcotics_management.sql
+supabase/migrations/009_inspection_form_editor_and_draft_privacy.sql
 ```
 
-in **Supabase → SQL Editor**.
+in **Supabase → SQL Editor**. Do not rerun migrations 001–008.
 
-Then replace/push the v0.6 application files to GitHub and allow Netlify to rebuild.
+Then replace/push the v0.6.1 application files to GitHub and allow Netlify to rebuild.
 
 After deployment:
 
@@ -115,6 +147,13 @@ After deployment:
 6. Add `RESEND_API_KEY` to Netlify.
 7. In Netlify **Functions**, confirm `narcotics-daily-report` appears with a **Scheduled** badge. You can use **Run now** to test it without waiting for the schedule.
 
-## Existing v0.5 inspection functionality
+## After deployment
 
-Digital system inspections and the System Inspector role from migrations 006 and 007 remain unchanged.
+1. Open **Inspections → Manage forms** as a System Administrator.
+2. Choose one of the five GEAEMS System forms.
+3. Click **Create editable draft**.
+4. Make a small test change, then publish the new version.
+5. Start a new inspection and confirm the new version is loaded.
+6. Save that inspection as a draft. Confirm that a System Inspector/System Administrator can see it and that an Agency Administrator cannot see or open it.
+
+The System Inspector role from migration 007 remains the role used to perform GEAEMS System inspections. v0.6.1 changes only form administration and draft visibility; it does not broaden who can perform System inspections.
