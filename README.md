@@ -138,3 +138,10 @@ npm run build
 ## Security
 
 The Supabase publishable key is browser-safe and is used by the normal portal client. The Supabase secret/service-role key bypasses Row Level Security and is used only in server-side User Management functions. Never expose it in browser code, public environment variables, or GitHub.
+
+
+## v0.3.2 Netlify build fix
+
+This patch wraps the `/login` and `/auth/setup-password` components that use Next.js `useSearchParams()` in React `Suspense` boundaries. This satisfies the Next.js 16 production prerender requirement and preserves the v0.3.1 password-setup identity safeguards.
+
+No new Supabase migration is required for v0.3.2.

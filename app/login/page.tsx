@@ -1,11 +1,11 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BrandLogo } from '@/components/brand-logo'
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const notice = searchParams.get('notice')
@@ -48,4 +48,23 @@ export default function LoginPage() {
     </section>
     <aside className="login-art" aria-hidden="true"><div className="cross"><span/><span/></div><div className="login-art-copy">System readiness.<br/>One portal.</div></aside>
   </main>
+}
+
+
+function LoginFallback() {
+  return <main className="login-page">
+    <section className="login-panel">
+      <BrandLogo size="large" />
+      <div className="login-heading">
+        <p className="eyebrow">Greater Elgin Area EMS System</p>
+        <h1>GEAEMS Portal</h1>
+        <p>Loading sign-in…</p>
+      </div>
+    </section>
+    <aside className="login-art" aria-hidden="true"><div className="cross"><span/><span/></div><div className="login-art-copy">System readiness.<br/>One portal.</div></aside>
+  </main>
+}
+
+export default function LoginPage() {
+  return <Suspense fallback={<LoginFallback />}><LoginContent /></Suspense>
 }

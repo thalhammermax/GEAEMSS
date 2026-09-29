@@ -1,13 +1,13 @@
 'use client'
 
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { FormEvent, Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BrandLogo } from '@/components/brand-logo'
 
 const WRONG_USER_MESSAGE = 'This password setup link belongs to a different portal user. Sign out of the portal or open the email link in a private/incognito window, then try again.'
 
-export default function SetupPasswordPage() {
+function SetupPasswordContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const expectedUserId = searchParams.get('uid')
@@ -143,4 +143,23 @@ export default function SetupPasswordPage() {
     </section>
     <aside className="login-art" aria-hidden="true"><div className="cross"><span/><span/></div><div className="login-art-copy">One identity.<br/>One system.</div></aside>
   </main>
+}
+
+
+function SetupPasswordFallback() {
+  return <main className="login-page">
+    <section className="login-panel">
+      <BrandLogo size="large" />
+      <div className="login-heading">
+        <p className="eyebrow">Greater Elgin Area EMS System</p>
+        <h1>Set your password</h1>
+        <p>Validating your password setup link…</p>
+      </div>
+    </section>
+    <aside className="login-art" aria-hidden="true"><div className="cross"><span/><span/></div><div className="login-art-copy">One identity.<br/>One system.</div></aside>
+  </main>
+}
+
+export default function SetupPasswordPage() {
+  return <Suspense fallback={<SetupPasswordFallback />}><SetupPasswordContent /></Suspense>
 }
