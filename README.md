@@ -1,30 +1,51 @@
-# GEAEMS Portal v0.6.4
+# GEAEMS Portal v0.6.6
 
-This point release ties **Agency Administrator access directly to provider agency affiliations**.
+This release fixes Provider access to the Narcotics module and adds an administrative Narcotics History view.
 
-## Before deploying
+## Before deployment
 
-Run only:
+Run this migration in Supabase SQL Editor:
 
-`supabase/migrations/012_agency_admin_affiliation_enforcement.sql`
+```text
+supabase/migrations/014_provider_narcotics_access_and_history_privacy.sql
+```
 
-Migrations 001–011 should already be applied.
+Run only `014`; migrations `001` through `013` should already be applied.
 
-## Agency Administrator assignment rules
+Then push the v0.6.6 project files to GitHub and allow Netlify to rebuild.
 
-A user can only be offered the **Agency Administrator** role when the account is linked to a provider record that has at least one active affiliation with an active agency.
+## Provider narcotics access
 
-On the user-management page:
+A Provider-only account can now access:
 
-- If the provider has no active agency affiliations, **Agency Administrator does not appear as a role option at all**.
-- If the provider is affiliated with Elgin FD and Bartlett FD, only Elgin FD and Bartlett FD appear in **Agency administration access**.
-- Every other agency is omitted from the page entirely; it is not shown disabled and cannot be selected.
-- Ending an affiliation automatically removes that user's agency-admin access for that agency.
-- If all active affiliations are removed, the Agency Administrator role itself is removed automatically.
-- Relinking a portal account to another provider or deactivating an agency also cleans up invalid agency-admin assignments.
+- **My Profile**
+- **Narcotics**
 
-The database contains matching validation triggers as a safety net, but the normal user interface does not present invalid choices.
+Providers may start, save, resume, and electronically submit the daily count only for apparatus whose agency matches an active provider affiliation on their linked provider record.
 
-## Existing functionality
+Provider access to narcotics records follows least privilege:
 
-All v0.6.3 functionality remains, including agency inspection form creation, inspection form editing/versioning, draft-system-inspection privacy, Narcotics Management, System Inspector access, credentials, personnel, fleet, and user management.
+- today's count/status for an actively affiliated agency is visible so providers can see whether the apparatus has already been counted;
+- a provider can view historical counts they personally started or signed;
+- the full agency narcotics history is not exposed to ordinary Provider accounts.
+
+A System Inspector who is also linked to a provider record receives the same Narcotics access in addition to Inspections.
+
+## Administrative history
+
+System Administrators and Agency Administrators now have **Narcotics → History**.
+
+The history page includes submitted daily-count logs with:
+
+- count date and submission time;
+- agency;
+- apparatus;
+- narcotics form;
+- seal number;
+- electronic signer;
+- discrepancy status;
+- a link to the immutable signed count detail.
+
+Filters are available for agency, apparatus, date range, and discrepancy status.
+
+System Administrators see system-wide history. Agency Administrators see only agencies assigned to them through Agency Administration access.

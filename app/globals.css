@@ -375,3 +375,11 @@ td strong { color: var(--navy); }
 .narcotics-dashboard-alert a { display:inline-block; margin-top:7px; color:#7e1d24; font-size:10px; font-weight:850; text-decoration:none; }
 .narcotics-dashboard-alert a:hover { text-decoration:underline; }
 @media (max-width:700px) { .inline-form { align-items:stretch; flex-direction:column; } .inline-form select { min-width:0; width:100%; } }
+
+/* v0.6.6 provider narcotics access + administrative history */
+.header-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.narcotics-history-filter { grid-template-columns: repeat(5, minmax(135px, 1fr)) auto auto; }
+.narcotics-history-filter input { width:100%; border:1px solid #ccd5dd; border-radius:8px; padding:10px 11px; background:white; color:var(--ink); outline:none; }
+.narcotics-history-filter input:focus { border-color:var(--navy-3); box-shadow:0 0 0 3px rgba(23,59,96,.08); }
+@media (max-width: 1050px) { .narcotics-history-filter { grid-template-columns:1fr 1fr 1fr; } }
+@media (max-width: 700px) { .header-actions { justify-content:flex-start; } .narcotics-history-filter { grid-template-columns:1fr; } }

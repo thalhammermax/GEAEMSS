@@ -65,15 +65,20 @@ export async function proxy(request: NextRequest) {
     if (path === '/') return redirectTo(request, '/inspections')
     const inspectionPath = path === '/inspections' || path.startsWith('/inspections/')
     const ownProfilePath = path === '/my-profile' && !!profile.provider_id
-    if (!inspectionPath && !ownProfilePath) return redirectTo(request, '/inspections')
+    const narcoticsPath = !!profile.provider_id && (path === '/narcotics' || path.startsWith('/narcotics/'))
+    if (!inspectionPath && !ownProfilePath && !narcoticsPath) return redirectTo(request, '/inspections')
     return supabaseResponse
   }
 
-  // Provider-level accounts are self-service only. They cannot navigate to
-  // dashboard/personnel lists/fleet/reports/administration, even by typing a URL.
+  // Provider-level accounts are self-service users, but they also participate
+  // in daily narcotics counts for apparatus belonging to agencies where they
+  // have an active provider affiliation. Administrative narcotics routes still
+  // enforce their own role checks server-side.
   if (!isAdmin) {
     if (!profile.provider_id) return redirectTo(request, '/auth/disabled')
-    if (path !== '/my-profile' && path !== '/') return redirectTo(request, '/my-profile')
+    const ownProfilePath = path === '/my-profile'
+    const narcoticsPath = path === '/narcotics' || path.startsWith('/narcotics/')
+    if (!ownProfilePath && !narcoticsPath && path !== '/') return redirectTo(request, '/my-profile')
     if (path === '/') return redirectTo(request, '/my-profile')
   }
 
