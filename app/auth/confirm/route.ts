@@ -39,14 +39,15 @@ export async function GET(request: NextRequest) {
     return loginError(request, 'This account setup link is invalid. Ask a System Administrator to send a new email.')
   }
 
-  const destination = safeSetupDestination(rawNext, request.nextUrl.origin)
-  const redirectUrl = new URL(destination, request.nextUrl.origin)
-
-  // The session created by verifyOtp must be written onto the SAME redirect
-  // response that sends the browser to the setup-password page. Using the
-  // generic Server Component helper here can leave the browser without the
-  // recovery/invite cookies after the redirect.
-  const response = NextResponse.redirect(redirectUrl)
+  // Collect every cookie Supabase wants to set while verifying the token.
+  // We construct the redirect only AFTER verifyOtp succeeds so the redirect
+  // can be bound to the exact user Supabase verified, then attach the cookies
+  // to that same final response.
+  let pendingCookies: Array<{
+    name: string
+    value: string
+    options?: Parameters<NextResponse['cookies']['set']>[2]
+  }> = []
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,10 +58,8 @@ export async function GET(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
+          pendingCookies = cookiesToSet
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options)
-          })
         },
       },
     },
@@ -74,6 +73,18 @@ export async function GET(request: NextRequest) {
   if (error || !data.session || !data.user) {
     return loginError(request, 'This account setup link is invalid or has expired. Ask a System Administrator to send a new email.')
   }
+
+  const destination = safeSetupDestination(rawNext, request.nextUrl.origin)
+  const redirectUrl = new URL(destination, request.nextUrl.origin)
+
+  // Supabase is the authority for the account identity. Never depend on the
+  // nested RedirectTo query string to preserve a uid/provider parameter.
+  redirectUrl.searchParams.set('uid', data.user.id)
+
+  const response = NextResponse.redirect(redirectUrl)
+  pendingCookies.forEach(({ name, value, options }) => {
+    response.cookies.set(name, value, options)
+  })
 
   return response
 }

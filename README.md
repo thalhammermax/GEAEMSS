@@ -1,3 +1,13 @@
+# GEAEMS Portal v0.3.5
+
+## Password setup identity fix
+
+This patch changes `/auth/confirm` so the password setup page is bound to the **user ID actually verified by Supabase**, rather than depending on `RedirectTo` to preserve a `uid` or `provider` query parameter. This fixes the “password setup link is missing its account identity” error for both invitation and recovery emails.
+
+No Supabase SQL migration is required. Deploy the code, then send a **new** invite/reset email. Previously issued or already-used auth links should not be reused.
+
+---
+
 # GEAEMS Portal v0.3.4
 
 Hotfix for invite/password-reset session handoff.
