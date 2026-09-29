@@ -44,6 +44,7 @@ export default async function NewVehiclePage({ searchParams }: Props) {
         {isEnabled(map,'retired_date') && <label className="field"><span>Retired date{req('retired_date') ? ' *' : ''}</span><input name="retired_date" type="date" required={req('retired_date')} /></label>}
       </div>
       {isEnabled(map,'notes') && <label className="field"><span>Notes{req('notes') ? ' *' : ''}</span><textarea name="notes" rows={3} required={req('notes')} /></label>}
+      <div className="form-section-divider"><span>Narcotics Management</span></div><label className="checkbox-field"><input type="checkbox" name="narcotics_count_required"/><span>Require a signed daily narcotics count for this apparatus</span></label>
       <CustomFieldInputs fields={custom} />
       <div className="form-actions"><Link className="secondary-button button-link" href="/fleet">Cancel</Link><button className="primary-button" type="submit">Create vehicle</button></div>
     </form>

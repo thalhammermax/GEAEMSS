@@ -14,11 +14,12 @@ export default async function VehiclePage({ params, searchParams }: Props) {
   const { id } = await params
   const qs = await searchParams
   const supabase = await createClient()
-  const [{ data: vehicle, error }, { data: agencies }, { data: types }, { data: statuses }, fieldResult, valueResult] = await Promise.all([
+  const [{ data: vehicle, error }, { data: agencies }, { data: types }, { data: statuses }, { data: narcoticsTemplates }, fieldResult, valueResult] = await Promise.all([
     supabase.from('vehicles').select('*, agencies(name, short_name), vehicle_types(name), vehicle_statuses(name)').eq('id', id).maybeSingle(),
     supabase.from('agencies').select('id, name').eq('active', true).order('name'),
     supabase.from('vehicle_types').select('id, name').eq('active', true).order('sort_order'),
     supabase.from('vehicle_statuses').select('id, name').eq('active', true).order('sort_order'),
+    supabase.from('narcotics_count_templates').select('id, name, scope_type, agency_id').eq('active', true).order('name'),
     fetchFieldDefinitions(supabase, 'vehicle'),
     fetchCustomFieldValues(supabase, id),
   ])
@@ -54,6 +55,8 @@ export default async function VehiclePage({ params, searchParams }: Props) {
           {isEnabled(map,'retired_date') && <label className="field"><span>Retired date{req('retired_date') ? ' *' : ''}</span><input name="retired_date" type="date" defaultValue={vehicle.retired_date ?? ''} required={req('retired_date')} /></label>}
         </div>
         {isEnabled(map,'notes') && <label className="field"><span>Notes{req('notes') ? ' *' : ''}</span><textarea name="notes" rows={3} defaultValue={vehicle.notes ?? ''} required={req('notes')} /></label>}
+        <div className="form-section-divider"><span>Narcotics Management</span></div>
+        <div className="form-grid"><label className="checkbox-field"><input type="checkbox" name="narcotics_count_required" defaultChecked={vehicle.narcotics_count_required}/><span>Require a signed daily narcotics count for this apparatus</span></label><label className="field"><span>Count template override</span><select name="narcotics_template_id" defaultValue={vehicle.narcotics_template_id ?? ''}><option value="">Use agency default</option>{(narcoticsTemplates ?? []).filter((t:any) => t.scope_type === 'system' || t.agency_id === vehicle.agency_id).map((t:any) => <option key={t.id} value={t.id}>{t.name}{t.scope_type === 'system' ? ' · System' : ''}</option>)}</select></label></div>
         <CustomFieldInputs fields={custom} values={valueResult.values} />
         <div className="form-actions"><button className="primary-button" type="submit">Save changes</button></div>
       </form>

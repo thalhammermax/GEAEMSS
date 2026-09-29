@@ -1,117 +1,120 @@
-# GEAEMS Portal v0.5.2
-
-GEAEMS System personnel, credential, fleet, and digital vehicle inspection portal.
+# GEAEMS Portal v0.6
 
 Production URL: `https://portal.geaemss.org`
 
-## v0.5 — Digital Inspections
+v0.6 adds a full **Narcotics Management** module to the existing personnel, credential, fleet, and digital inspection portal.
 
-v0.5 turns the Inspections module into an inspection workflow rather than a history-only screen.
+## Daily narcotics counts
 
-### Included inspection profiles
+- ALS and critical-care apparatus are automatically marked as requiring a daily count when they use the GEAEMS ALS / Critical Care vehicle types.
+- Other vehicles may be manually enabled from their Fleet record.
+- Providers can perform a count **only when their portal login is linked to an active provider affiliation with that vehicle's agency**.
+- Agency Administrator or System Administrator status by itself does not authorize an electronic count signature; the signer must also be an affiliated provider.
+- Each apparatus has one count record per calendar day.
+- Counts can be saved as drafts and resumed later.
+- Submitted counts are locked from editing.
+- Any actual quantity that differs from the template's expected quantity is automatically flagged as a discrepancy.
 
-The supplied `gea-idph-ems-comparison-matrix.xlsx` is included under `docs/` and is seeded into versioned digital forms for:
+## Electronic signature
 
-- GEA BLS Non-Transport — 81 applicable checklist items
-- GEA BLS Ambulance — 94 applicable checklist items
-- GEA ALS Non-Transport — 118 applicable checklist items
-- GEA ALS Ambulance — 135 applicable checklist items
-- GEA Critical Care Transport — 144 applicable checklist items
+Submission requires:
 
-The source matrix contains 147 unique line items in 11 sections. Items marked `N/A` for a vehicle profile are omitted from that vehicle's inspection form. Exact requirement text from the matrix (quantity, sets, sizes, medication totals, `Required`, etc.) is displayed next to each checklist item.
+1. every active template item to have an actual count;
+2. the provider to type their name;
+3. the provider to accept the agency's electronic-signature attestation.
 
-### Inspector workflow
+The database records the authenticated user, linked provider, typed signature, timestamp, attestation, and a SHA-256 signature hash generated from the signed count snapshot.
 
-1. Open **Inspections**.
-2. Select **Start inspection**.
-3. Select a vehicle.
-4. The portal loads the published form that matches the vehicle's type.
-5. For each applicable item, mark **Compliant** or **Deficient**, with optional observed/count and notes.
-6. Use **Mark section compliant** to speed up a section.
-7. Save an incomplete inspection as a draft and resume it later.
-8. Submit the inspection when every required line item has a disposition.
-9. Failed line items automatically become vehicle deficiencies.
-10. Submitted inspections are locked for normal agency editing and remain historical records against the exact form version used.
+## Templates
 
-### Vehicle types
+Go to:
 
-Migration 006 adds the five specific matrix vehicle types while leaving existing generic fleet types intact. Vehicles that need digital matrix inspections should use one of these five types. A generic vehicle type will show that no inspection form is assigned.
+**Narcotics → Templates & settings**
 
-### Versioning
+System Administrators can create GEAEMS System templates. Agency Administrators with **Narcotics** permission can create templates owned by their agency.
 
-Inspection forms are versioned. Completed inspections reference the exact form version and exact line-item definitions used at the time of inspection. Future edits to a template will therefore not rewrite historic inspections.
+Each template item supports:
 
-The schema supports both System-owned and Agency-owned inspection templates, although v0.5 ships the supplied matrix as GEAEMS System templates. A visual template editor can be added later without redesigning completed-inspection storage.
+- medication / controlled substance name;
+- concentration;
+- dosage form;
+- optional controlled-substance schedule label;
+- expected quantity;
+- unit label;
+- sort order.
 
-## Deploying v0.5
+An agency can select a default template. A Fleet record can optionally override that template for an individual apparatus.
 
-Your database should already have migrations `001` through `005` applied.
+## Agency permissions
 
-Run only:
+Migration 008 adds two agency-access settings under User Management:
+
+- **Narcotics** — allows that Agency Administrator to manage their agency's narcotics templates/settings.
+- **Narcotics email report** — includes that Agency Administrator on the automated incomplete-count report.
+
+Existing Agency Administrator access rows default to receiving the report.
+
+## Automated incomplete-count report
+
+The repository includes:
+
+`netlify/functions/narcotics-daily-report.mjs`
+
+It is a Netlify Scheduled Function that runs hourly. For each enabled agency, once the configured local report hour has passed, it checks every active apparatus requiring a narcotics count. If one or more do not have a **submitted** count for that local date, the function emails the Agency Administrators who have **Narcotics email report** enabled.
+
+A draft counts as incomplete until it is electronically signed and submitted.
+
+The function records successful or no-action daily runs in `narcotics_report_history` so an agency does not receive duplicate daily alerts.
+
+### Netlify environment variable required
+
+Add this server-side environment variable in Netlify:
 
 ```text
-supabase/migrations/006_digital_vehicle_inspections.sql
+RESEND_API_KEY=re_...
 ```
 
-in **Supabase → SQL Editor**.
+You can use the same Resend API key that you configured as the SMTP password for Supabase Auth. Do **not** place it in GitHub or prefix it with `NEXT_PUBLIC_`.
 
-Then push the v0.5 application files to GitHub and allow Netlify to rebuild.
+Optional sender override:
 
-No new Netlify environment variables are required.
+```text
+NARCOTICS_REPORT_FROM=GEAEMS Portal <no-reply@auth.geaemss.org>
+```
 
-## Existing environment variables
+The scheduled function also uses the existing:
 
 ```text
 NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 SUPABASE_SECRET_KEY
-NEXT_PUBLIC_SITE_URL=https://portal.geaemss.org
 ```
 
-Never commit the Supabase secret key to GitHub.
+Ensure those variables and `RESEND_API_KEY` are available to Netlify Functions at runtime.
 
+## Deploying v0.6
 
-## v0.5.1 patch
-
-Fixed a Next.js/TypeScript build failure on the Start Inspection page caused by Supabase relationship joins being inferred as arrays. No database migration changes are required beyond migration 006 from v0.5.
-
-## v0.5.2 — System Inspector role
-
-Migration `007_system_inspector_role.sql` adds a dedicated `system_inspector` authorization role.
-
-### System Inspector access
-
-A user with **System Inspector** (without an additional administrator role):
-
-- lands on **Inspections** after login;
-- can see the active vehicles and agency labels needed to identify units across the GEAEMS System;
-- can start, save, resume, and submit **GEAEMS System** inspection forms;
-- can review GEAEMS System inspection history and the deficiencies generated by those inspections;
-- can open **My Profile** as well if the account is linked to a provider record;
-- cannot access Dashboard, Personnel, Credential Administration, Fleet management, Reports, User Management, or general Administration.
-
-**System Administrators** retain full inspection authority.
-
-An **Agency Administrator** may view GEAEMS System inspection history for vehicles in an agency they administer, but cannot perform, resume, save, or submit a GEAEMS System inspection. Agency-owned inspection forms remain available to an Agency Administrator with Fleet permission.
-
-The restriction is enforced with PostgreSQL RLS/helper functions as well as the application UI, so hiding or manually calling an endpoint does not bypass the role requirement.
-
-### Deploying v0.5.2
-
-Your database should already have migrations `001` through `006` applied.
+Your project should already have migrations `001` through `007` applied.
 
 Run only:
 
 ```text
-supabase/migrations/007_system_inspector_role.sql
+supabase/migrations/008_narcotics_management.sql
 ```
 
 in **Supabase → SQL Editor**.
 
-Then push the v0.5.2 application files to GitHub and let Netlify rebuild.
+Then replace/push the v0.6 application files to GitHub and allow Netlify to rebuild.
 
-After deployment, assign the new role from:
+After deployment:
 
-**Administration → User Management → [User] → System roles → System Inspector**
+1. Open **Narcotics → Templates & settings**.
+2. Create at least one count template and add the medications/controlled substances to it.
+3. Assign a default template to each participating agency.
+4. Verify each ALS apparatus under **Fleet**. GEAEMS ALS/CC vehicle types are automatically count-required.
+5. In **Administration → User Management**, confirm which Agency Administrators should receive narcotics reports.
+6. Add `RESEND_API_KEY` to Netlify.
+7. In Netlify **Functions**, confirm `narcotics-daily-report` appears with a **Scheduled** badge. You can use **Run now** to test it without waiting for the schedule.
 
-A provider may have both **Provider** and **System Inspector** roles. This gives them their own My Profile page in addition to the System Inspections workspace.
+## Existing v0.5 inspection functionality
+
+Digital system inspections and the System Inspector role from migrations 006 and 007 remain unchanged.

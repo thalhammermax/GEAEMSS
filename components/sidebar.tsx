@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { AmbulanceIcon, ClipboardIcon, CredentialIcon, DashboardIcon, PeopleIcon, ReportIcon, SettingsIcon } from './icons'
+import { AmbulanceIcon, ClipboardIcon, CredentialIcon, DashboardIcon, NarcoticsIcon, PeopleIcon, ReportIcon, SettingsIcon } from './icons'
 
 const adminItems = [
   { href: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
@@ -10,11 +10,13 @@ const adminItems = [
   { href: '/credentials', label: 'Credentials', icon: CredentialIcon },
   { href: '/fleet', label: 'Fleet', icon: AmbulanceIcon },
   { href: '/inspections', label: 'Inspections', icon: ClipboardIcon },
+  { href: '/narcotics', label: 'Narcotics', icon: NarcoticsIcon },
   { href: '/reports', label: 'Reports', icon: ReportIcon },
   { href: '/administration', label: 'Administration', icon: SettingsIcon },
 ]
 
 const providerItems = [
+  { href: '/narcotics', label: 'Narcotics', icon: NarcoticsIcon },
   { href: '/my-profile', label: 'My Profile', icon: PeopleIcon },
 ]
 

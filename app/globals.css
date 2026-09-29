@@ -315,3 +315,22 @@ td strong { color: var(--navy); }
 .inspection-submit-bar span { color:var(--muted); font-size:10px; margin-top:3px; }
 @media (max-width: 1200px) { .inspection-item { grid-template-columns:34px minmax(220px,1fr) minmax(240px,.9fr); } .inspection-item-detail { grid-column:2 / -1; } }
 @media (max-width: 820px) { .inspection-summary-strip { grid-template-columns:1fr 1fr; } .inspection-summary-strip > div:nth-child(2) { border-right:0; } .inspection-summary-strip > div:nth-child(-n+2) { border-bottom:1px solid var(--line); } .inspection-item { grid-template-columns:30px 1fr; } .inspection-response-options, .inspection-item-detail { grid-column:2; } .inspection-item-detail { grid-template-columns:1fr; } .inspection-section-heading, .inspection-submit-bar { align-items:flex-start; flex-direction:column; } }
+
+/* v0.6 Narcotics Management */
+.narcotics-count-list { display: grid; gap: 10px; margin-bottom: 22px; }
+.narcotics-count-row { display: grid; grid-template-columns: minmax(190px,1.3fr) 130px 130px minmax(170px,.9fr); gap: 12px; align-items: end; padding: 14px; border: 1px solid #e2e8ed; border-radius: 9px; background: #fbfcfd; }
+.narcotics-count-row > div:first-child { align-self: center; }
+.narcotics-count-row > div:first-child strong { display:block; color:var(--navy); font-size:13px; }
+.narcotics-count-row > div:first-child span { display:block; color:var(--muted); font-size:10px; margin-top:4px; }
+.expected-count { align-self:center; }
+.expected-count span { display:block; color:#85929e; text-transform:uppercase; font-size:9px; font-weight:800; letter-spacing:.07em; }
+.expected-count strong { display:block; color:var(--navy); font-size:14px; margin-top:4px; }
+.signature-box { margin-top:22px; padding:18px; border:1px solid #cbd7e0; border-left:4px solid var(--navy-3); border-radius:9px; background:#f7fafc; display:grid; gap:14px; }
+.signature-box > div > span { color:var(--red); text-transform:uppercase; letter-spacing:.1em; font-size:9px; font-weight:850; }
+.signature-box h3 { margin:4px 0 5px; color:var(--navy); font-size:17px; }
+.signature-box p { margin:0; color:var(--muted); font-size:11px; line-height:1.55; max-width:850px; }
+.signature-record { margin-top:20px; }
+.signature-record code { overflow-wrap:anywhere; color:#52606d; font-size:10px; }
+.agency-settings-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+@media (max-width: 1050px) { .narcotics-count-row { grid-template-columns:1fr 1fr; } .agency-settings-grid { grid-template-columns:1fr; } }
+@media (max-width: 700px) { .narcotics-count-row { grid-template-columns:1fr; } }

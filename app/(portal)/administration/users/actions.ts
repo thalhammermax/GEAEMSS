@@ -109,6 +109,8 @@ export async function saveAgencyAccess(formData: FormData) {
         can_manage_personnel: checked(formData, 'can_manage_personnel'),
         can_manage_credentials: checked(formData, 'can_manage_credentials'),
         can_manage_fleet: checked(formData, 'can_manage_fleet'),
+        can_manage_narcotics: checked(formData, 'can_manage_narcotics'),
+        receive_narcotics_reports: checked(formData, 'receive_narcotics_reports'),
       }, { onConflict: 'user_id,agency_id' })
       if (error) throw error
     } else {

@@ -16,7 +16,7 @@ async function vehiclePayload(supabase: any, formData: FormData, path: string) {
   const { fields, error } = await fetchFieldDefinitions(supabase, 'vehicle')
   if (error) fail(path, error.message)
   const map = builtinFieldMap(fields)
-  const payload: Record<string, string | number | null> = {}
+  const payload: Record<string, string | number | boolean | null> = {}
 
   for (const key of ['agency_id','vehicle_type_id','vehicle_status_id','unit_number','fleet_number','vin','make','model','license_plate','license_plate_state','in_service_date','retired_date','notes']) {
     if (!isEnabled(map, key)) continue
@@ -34,6 +34,10 @@ async function vehiclePayload(supabase: any, formData: FormData, path: string) {
       payload.year = parsed
     } else payload.year = null
   }
+
+  payload.narcotics_count_required = formData.get('narcotics_count_required') === 'on'
+  const narcoticsTemplateId = textValue(formData, 'narcotics_template_id')
+  payload.narcotics_template_id = narcoticsTemplateId || null
 
   return payload
 }
