@@ -1,4 +1,4 @@
-# GEAEMS Portal v0.5
+# GEAEMS Portal v0.5.1
 
 GEAEMS System personnel, credential, fleet, and digital vehicle inspection portal.
 
@@ -69,3 +69,8 @@ NEXT_PUBLIC_SITE_URL=https://portal.geaemss.org
 ```
 
 Never commit the Supabase secret key to GitHub.
+
+
+## v0.5.1 patch
+
+Fixed a Next.js/TypeScript build failure on the Start Inspection page caused by Supabase relationship joins being inferred as arrays. No database migration changes are required beyond migration 006 from v0.5.

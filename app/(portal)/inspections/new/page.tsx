@@ -26,15 +26,18 @@ export default async function StartInspectionPage({ searchParams }: Props) {
     vehicleQuery = vehicleQuery.in('agency_id', manageableAgencyIds)
   }
   const { data: vehicles } = await vehicleQuery
+  // Supabase's generated relationship type can represent joined to-one relations as arrays.
+  // Normalize this page to a UI-facing row type; RLS still governs the underlying query.
+  const vehicleRows = (vehicles ?? []) as any[]
 
   if (!qs.vehicle) {
     return <>
       <PageHeader eyebrow="Inspections" title="Start Inspection" description="Choose the vehicle you are inspecting. The portal will load the correct GEAEMS checklist for its vehicle type." />
-      <div className="table-card">{!vehicles?.length ? <div className="empty-state"><strong>No inspectable vehicles found</strong><span>Add a fleet vehicle or grant Fleet management access first.</span></div> : <table><thead><tr><th>Unit</th><th>Agency</th><th>Vehicle</th><th>Inspection profile</th><th></th></tr></thead><tbody>{vehicles.map((v:any)=><tr key={v.id}><td><strong>{v.unit_number || v.fleet_number || 'Unnumbered'}</strong></td><td>{v.agencies?.short_name || v.agencies?.name || '—'}</td><td>{[v.year,v.make,v.model].filter(Boolean).join(' ') || '—'}</td><td>{v.vehicle_types?.name || 'Not assigned'}</td><td className="table-action"><Link href={`/inspections/new?vehicle=${v.id}`}>Inspect</Link></td></tr>)}</tbody></table>}</div>
+      <div className="table-card">{!vehicleRows.length ? <div className="empty-state"><strong>No inspectable vehicles found</strong><span>Add a fleet vehicle or grant Fleet management access first.</span></div> : <table><thead><tr><th>Unit</th><th>Agency</th><th>Vehicle</th><th>Inspection profile</th><th></th></tr></thead><tbody>{vehicleRows.map((v:any)=><tr key={v.id}><td><strong>{v.unit_number || v.fleet_number || 'Unnumbered'}</strong></td><td>{v.agencies?.short_name || v.agencies?.name || '—'}</td><td>{[v.year,v.make,v.model].filter(Boolean).join(' ') || '—'}</td><td>{v.vehicle_types?.name || 'Not assigned'}</td><td className="table-action"><Link href={`/inspections/new?vehicle=${v.id}`}>Inspect</Link></td></tr>)}</tbody></table>}</div>
     </>
   }
 
-  const vehicle = (vehicles ?? []).find((v:any)=>v.id === qs.vehicle)
+  const vehicle = vehicleRows.find((v:any)=>v.id === qs.vehicle)
   if (!vehicle) return <><PageHeader eyebrow="Inspections" title="Start Inspection" description="Perform a digital vehicle inspection." /><div className="banner danger"><div><strong>Vehicle unavailable</strong><span>The vehicle was not found or you do not have permission to inspect it.</span></div></div><Link className="secondary-button button-link" href="/inspections/new">Choose another vehicle</Link></>
 
   const { data: templates } = await supabase.from('inspection_form_templates').select('id, code, name, scope_type, agency_id, vehicle_type_id, inspection_type_id').eq('vehicle_type_id', vehicle.vehicle_type_id).eq('active', true)
