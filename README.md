@@ -1,37 +1,30 @@
-# GEAEMS Portal v0.6.3
+# GEAEMS Portal v0.6.4
 
-This point release adds the missing **Agency Inspection Form creation workflow**.
+This point release ties **Agency Administrator access directly to provider agency affiliations**.
 
 ## Before deploying
 
 Run only:
 
-`supabase/migrations/011_agency_inspection_form_creation.sql`
+`supabase/migrations/012_agency_admin_affiliation_enforcement.sql`
 
-Migrations 001–010 should already be applied.
+Migrations 001–011 should already be applied.
 
-## Agency Administrator workflow
+## Agency Administrator assignment rules
 
-An Agency Administrator must have **Fleet** permission for the agency.
+A user can only be offered the **Agency Administrator** role when the account is linked to a provider record that has at least one active affiliation with an active agency.
 
-1. Open **Inspections**.
-2. Choose **Manage forms**.
-3. Choose **New agency form**.
-4. Select an agency the user has Fleet permission for.
-5. Select the vehicle type.
-6. Enter the form name and optional description.
-7. The portal creates **version 1 as a draft** and opens the form editor.
-8. Add sections/items and publish the version when ready.
+On the user-management page:
 
-Agency-owned forms do not replace GEAEMS System forms. They are separate inspection checklists and can only be performed for vehicles in the owning agency.
+- If the provider has no active agency affiliations, **Agency Administrator does not appear as a role option at all**.
+- If the provider is affiliated with Elgin FD and Bartlett FD, only Elgin FD and Bartlett FD appear in **Agency administration access**.
+- Every other agency is omitted from the page entirely; it is not shown disabled and cannot be selected.
+- Ending an affiliation automatically removes that user's agency-admin access for that agency.
+- If all active affiliations are removed, the Agency Administrator role itself is removed automatically.
+- Relinking a portal account to another provider or deactivating an agency also cleans up invalid agency-admin assignments.
 
-For deterministic form selection, the portal permits one active agency inspection form per **agency + vehicle type**. To change the checklist, edit/version the existing form instead of creating duplicates.
+The database contains matching validation triggers as a safety net, but the normal user interface does not present invalid choices.
 
-## Permissions
+## Existing functionality
 
-- **System Administrator:** can create agency forms for any active agency.
-- **Agency Administrator + Fleet permission:** can create and edit agency forms for authorized agencies.
-- **System Inspector:** does not create agency-owned forms by virtue of the System Inspector role.
-- **Provider:** no inspection form administration access.
-
-A generic **Agency Vehicle Inspection** inspection type is added by migration 011 so agency inspections are labeled separately from the official GEAEMS System Vehicle Equipment Inspection in history/reporting.
+All v0.6.3 functionality remains, including agency inspection form creation, inspection form editing/versioning, draft-system-inspection privacy, Narcotics Management, System Inspector access, credentials, personnel, fleet, and user management.

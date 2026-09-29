@@ -68,6 +68,31 @@ export async function saveUserRoles(formData: FormData) {
   try {
     const { supabase, user } = await requireSystemAdmin()
     if (user.id === userId && !roles.includes('system_admin')) throw new Error('You cannot remove your own System Administrator role.')
+    if (roles.includes('agency_admin')) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('provider_id')
+        .eq('id', userId)
+        .maybeSingle()
+      if (profileError) throw profileError
+      if (!profile?.provider_id) throw new Error('Agency Administrator is only available to users linked to a provider record with an active agency affiliation.')
+      const { data: affiliationRows, error: affiliationError } = await supabase
+        .from('provider_agencies')
+        .select('agency_id')
+        .eq('provider_id', profile.provider_id)
+        .eq('active', true)
+      if (affiliationError) throw affiliationError
+      const agencyIds = [...new Set((affiliationRows ?? []).map((row:any) => row.agency_id).filter(Boolean))]
+      if (!agencyIds.length) throw new Error('Agency Administrator is only available to users whose provider record has an active agency affiliation.')
+      const { data: activeAgencies, error: agencyError } = await supabase
+        .from('agencies')
+        .select('id')
+        .in('id', agencyIds)
+        .eq('active', true)
+        .limit(1)
+      if (agencyError) throw agencyError
+      if (!activeAgencies?.length) throw new Error('Agency Administrator is only available to users whose provider record has an active affiliation with an active agency.')
+    }
     const { error: deleteError } = await supabase.from('user_roles').delete().eq('user_id', userId)
     if (deleteError) throw deleteError
     if (roles.length) {
@@ -103,6 +128,30 @@ export async function saveAgencyAccess(formData: FormData) {
     if (roleError) throw roleError
     if (!agencyAdminRole) throw new Error('Agency permissions can only be assigned to a user with the Agency Administrator role.')
     if (checked(formData, 'enabled')) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('provider_id')
+        .eq('id', userId)
+        .maybeSingle()
+      if (profileError) throw profileError
+      if (!profile?.provider_id) throw new Error('This user is not linked to a provider record.')
+      const { data: affiliation, error: affiliationError } = await supabase
+        .from('provider_agencies')
+        .select('id')
+        .eq('provider_id', profile.provider_id)
+        .eq('agency_id', agencyId)
+        .eq('active', true)
+        .maybeSingle()
+      if (affiliationError) throw affiliationError
+      if (!affiliation) throw new Error('Agency Administrator access can only be assigned to an agency where the linked provider has an active affiliation.')
+      const { data: agency, error: agencyError } = await supabase
+        .from('agencies')
+        .select('id')
+        .eq('id', agencyId)
+        .eq('active', true)
+        .maybeSingle()
+      if (agencyError) throw agencyError
+      if (!agency) throw new Error('Agency Administrator access cannot be assigned to an inactive agency.')
       const { error } = await supabase.from('user_agency_access').upsert({
         user_id: userId,
         agency_id: agencyId,
