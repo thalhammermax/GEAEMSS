@@ -16,10 +16,11 @@ export default async function CredentialsPage({ searchParams }: Props) {
   const { error: queryError, notice } = await searchParams
   const supabase = await createClient()
   const context = await getCredentialAdminContext(supabase)
-  const [{ data: types, error }, { count: currentCount }, { count: requirementCount }] = await Promise.all([
+  const [{ data: types, error }, { count: currentCount }, { count: requirementCount }, { count: pendingCount }] = await Promise.all([
     supabase.from('credential_types').select('*, agencies(name, short_name)').order('scope_type').order('category').order('name'),
     supabase.from('provider_credentials').select('*', { count: 'exact', head: true }).eq('is_current', true).eq('verification_status', 'verified'),
     supabase.from('credential_requirements').select('*', { count: 'exact', head: true }).eq('required', true),
+    supabase.from('credential_submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
   ])
 
   const rows = (types ?? []) as any[]
@@ -33,10 +34,10 @@ export default async function CredentialsPage({ searchParams }: Props) {
   })}</tbody></table>
 
   return <>
-    <PageHeader title="Credentials" description="GEAEMS System credentials apply across the system. Agencies may also maintain local credential definitions and requirements." action={canCreate ? <Link className="primary-button button-link" href="/credentials/new">Add credential</Link> : undefined} />
+    <PageHeader title="Credentials" description="GEAEMS System credentials apply across the system. Agencies may also maintain local credential definitions and requirements." action={<div className="inline-actions"><Link className="secondary-button button-link" href="/credentials/submissions">Review submissions{(pendingCount ?? 0) > 0 ? ` (${pendingCount})` : ''}</Link>{canCreate && <Link className="primary-button button-link" href="/credentials/new">Add credential</Link>}</div>} />
     {notice && <div className="banner success"><div><strong>Credential updated</strong><span>{notice}</span></div></div>}
     {queryError && <div className="banner danger"><div><strong>Credential action failed</strong><span>{queryError}</span></div></div>}
-    <div className="summary-strip"><div><span>System credentials</span><strong>{systemRows.length}</strong></div><div><span>Agency credentials visible to you</span><strong>{agencyRows.length}</strong></div><div><span>Current credential records</span><strong>{currentCount ?? 0}</strong></div><div><span>Active requirements</span><strong>{requirementCount ?? 0}</strong></div></div>
+    <div className="summary-strip"><div><span>System credentials</span><strong>{systemRows.length}</strong></div><div><span>Agency credentials visible to you</span><strong>{agencyRows.length}</strong></div><div><span>Current credential records</span><strong>{currentCount ?? 0}</strong></div><div><span>Pending verification</span><strong>{pendingCount ?? 0}</strong></div><div><span>Active requirements</span><strong>{requirementCount ?? 0}</strong></div></div>
 
     <section className="section-block"><div className="section-title"><div><span>GEAEMS</span><h2>System credentials</h2></div><div className="section-badge">{systemRows.length}</div></div><div className="table-card">{error ? <div className="empty-state danger-text">{error.message}</div> : renderTable(systemRows)}</div></section>
 

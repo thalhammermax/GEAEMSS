@@ -64,7 +64,7 @@ export async function proxy(request: NextRequest) {
   if (!isAdmin && isSystemInspector) {
     if (path === '/') return redirectTo(request, '/inspections')
     const inspectionPath = path === '/inspections' || path.startsWith('/inspections/')
-    const ownProfilePath = path === '/my-profile' && !!profile.provider_id
+    const ownProfilePath = !!profile.provider_id && (path === '/my-profile' || path.startsWith('/my-profile/'))
     const narcoticsPath = !!profile.provider_id && (path === '/narcotics' || path.startsWith('/narcotics/'))
     if (!inspectionPath && !ownProfilePath && !narcoticsPath) return redirectTo(request, '/inspections')
     return supabaseResponse
@@ -76,7 +76,7 @@ export async function proxy(request: NextRequest) {
   // enforce their own role checks server-side.
   if (!isAdmin) {
     if (!profile.provider_id) return redirectTo(request, '/auth/disabled')
-    const ownProfilePath = path === '/my-profile'
+    const ownProfilePath = path === '/my-profile' || path.startsWith('/my-profile/')
     const narcoticsPath = path === '/narcotics' || path.startsWith('/narcotics/')
     if (!ownProfilePath && !narcoticsPath && path !== '/') return redirectTo(request, '/my-profile')
     if (path === '/') return redirectTo(request, '/my-profile')
