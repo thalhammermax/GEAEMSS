@@ -18,11 +18,13 @@ export default async function StartInspectionPage({ searchParams }: Props) {
   ])
   const roleNames = new Set((roles ?? []).map((r:any)=>r.role))
   const isSystemAdmin = roleNames.has('system_admin')
+  const isSystemInspector = roleNames.has('system_inspector')
+  const canPerformSystemInspection = isSystemAdmin || isSystemInspector
   const manageableAgencyIds = (accessRows ?? []).filter((r:any)=>r.can_manage_fleet).map((r:any)=>r.agency_id)
 
   let vehicleQuery = supabase.from('vehicles').select('id, agency_id, vehicle_type_id, unit_number, fleet_number, year, make, model, active, agencies(name, short_name), vehicle_types(name, code)').eq('active', true).order('unit_number')
-  if (!isSystemAdmin) {
-    if (!manageableAgencyIds.length) return <><PageHeader eyebrow="Inspections" title="Start Inspection" description="Perform a digital vehicle inspection." /><div className="empty-state"><strong>No fleet inspection access</strong><span>Your account does not have Fleet management permission for an agency.</span></div></>
+  if (!canPerformSystemInspection) {
+    if (!manageableAgencyIds.length) return <><PageHeader eyebrow="Inspections" title="Start Inspection" description="Perform a digital vehicle inspection." /><div className="empty-state"><strong>No inspection access</strong><span>GEAEMS System inspections require the System Inspector or System Administrator role. Agency inspections require Fleet management permission and an agency-owned inspection form.</span></div></>
     vehicleQuery = vehicleQuery.in('agency_id', manageableAgencyIds)
   }
   const { data: vehicles } = await vehicleQuery
@@ -41,8 +43,10 @@ export default async function StartInspectionPage({ searchParams }: Props) {
   if (!vehicle) return <><PageHeader eyebrow="Inspections" title="Start Inspection" description="Perform a digital vehicle inspection." /><div className="banner danger"><div><strong>Vehicle unavailable</strong><span>The vehicle was not found or you do not have permission to inspect it.</span></div></div><Link className="secondary-button button-link" href="/inspections/new">Choose another vehicle</Link></>
 
   const { data: templates } = await supabase.from('inspection_form_templates').select('id, code, name, scope_type, agency_id, vehicle_type_id, inspection_type_id').eq('vehicle_type_id', vehicle.vehicle_type_id).eq('active', true)
-  const template = (templates ?? []).find((t:any)=>t.scope_type === 'agency' && t.agency_id === vehicle.agency_id) ?? (templates ?? []).find((t:any)=>t.scope_type === 'system')
-  if (!template) return <><PageHeader eyebrow="Inspections" title="No inspection form assigned" description={`${vehicle.unit_number || 'This vehicle'} does not have a published inspection form for its current vehicle type.`} /><div className="banner warning"><div><strong>Update the vehicle type</strong><span>The spreadsheet-based v0.5 forms are available for GEA BLS Non-Transport, GEA BLS Ambulance, GEA ALS Non-Transport, GEA ALS Ambulance, and GEA Critical Care Transport.</span></div></div><Link className="secondary-button button-link" href={`/fleet/${vehicle.id}`}>Open vehicle record</Link></>
+  const template = canPerformSystemInspection
+    ? (templates ?? []).find((t:any)=>t.scope_type === 'system')
+    : (templates ?? []).find((t:any)=>t.scope_type === 'agency' && t.agency_id === vehicle.agency_id)
+  if (!template) return <><PageHeader eyebrow="Inspections" title="No inspection form available" description={`${vehicle.unit_number || 'This vehicle'} does not have an inspection form you are authorized to perform.`} /><div className="banner warning"><div><strong>{canPerformSystemInspection ? 'No GEAEMS System form assigned' : 'No agency inspection form assigned'}</strong><span>{canPerformSystemInspection ? 'The vehicle must use one of the GEAEMS inspection vehicle types with a published System form.' : 'GEAEMS System inspections can only be performed by a System Inspector or System Administrator. Your agency must have its own inspection form to perform an agency inspection.'}</span></div></div><Link className="secondary-button button-link" href="/inspections">Back to inspections</Link></>
 
   const { data: versions } = await supabase.from('inspection_form_versions').select('id, version_number, status').eq('template_id', template.id).eq('status','published').order('version_number',{ascending:false}).limit(1)
   const formVersion = versions?.[0]
@@ -51,7 +55,7 @@ export default async function StartInspectionPage({ searchParams }: Props) {
   const { data: sections } = await supabase.from('inspection_form_sections').select('id, title, sort_order, inspection_form_items(id, label, requirement_text, allow_na, required, sort_order)').eq('form_version_id', formVersion.id).order('sort_order')
 
   return <>
-    <PageHeader eyebrow="Inspections" title={`Inspect ${vehicle.unit_number || vehicle.fleet_number || 'vehicle'}`} description={`${vehicle.agencies?.name || ''} · ${vehicle.vehicle_types?.name || ''}`} />
+    <PageHeader eyebrow={template.scope_type === 'system' ? 'GEAEMS System Inspection' : 'Agency Inspection'} title={`Inspect ${vehicle.unit_number || vehicle.fleet_number || 'vehicle'}`} description={`${vehicle.agencies?.name || ''} · ${vehicle.vehicle_types?.name || ''}`} />
     {qs.error && <div className="banner danger"><div><strong>Inspection was not saved</strong><span>{qs.error}</span></div></div>}
     <DigitalInspectionForm vehicle={vehicle} template={template} formVersion={formVersion} sections={(sections ?? []) as any[]} defaults={{ inspector_name: profile?.display_name ?? '', inspector_organization: vehicle.agencies?.name ?? '' }} />
   </>

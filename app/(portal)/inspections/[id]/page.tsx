@@ -13,6 +13,16 @@ export default async function InspectionPage({ params, searchParams }: Props) {
   const { id } = await params
   const qs = await searchParams
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const [{ data: roles }, { data: accessRows }] = await Promise.all([
+    supabase.from('user_roles').select('role').eq('user_id', user!.id),
+    supabase.from('user_agency_access').select('agency_id, can_manage_fleet').eq('user_id', user!.id),
+  ])
+  const roleNames = new Set((roles ?? []).map((r:any)=>r.role))
+  const isSystemAdmin = roleNames.has('system_admin')
+  const isSystemInspector = roleNames.has('system_inspector')
+  const isAgencyAdmin = roleNames.has('agency_admin')
+
   const { data: inspection, error } = await supabase.from('vehicle_inspections').select('*, vehicles(id, agency_id, vehicle_type_id, unit_number, fleet_number, year, make, model, agencies(name, short_name), vehicle_types(name, code)), inspection_types(name)').eq('id', id).maybeSingle()
   if (error || !inspection) notFound()
 
@@ -37,7 +47,13 @@ export default async function InspectionPage({ params, searchParams }: Props) {
   ])
   if (!template) notFound()
 
-  const readOnly = inspection.workflow_status !== 'draft'
+  const agencyFleetAccess = (accessRows ?? []).some((row:any) => row.agency_id === inspection.vehicles?.agency_id && row.can_manage_fleet)
+  const canEditDraft = inspection.workflow_status === 'draft' && (
+    isSystemAdmin
+    || (template.scope_type === 'system' && isSystemInspector)
+    || (template.scope_type === 'agency' && isAgencyAdmin && agencyFleetAccess)
+  )
+  const readOnly = !canEditDraft
   const statusLabel = inspection.workflow_status === 'draft' ? 'Draft' : titleCase(inspection.result || 'submitted')
 
   return <>

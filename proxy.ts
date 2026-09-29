@@ -52,8 +52,22 @@ export async function proxy(request: NextRequest) {
 
   const roleNames = new Set((roles ?? []).map((row: { role: string }) => row.role))
   const isAdmin = roleNames.has('system_admin') || roleNames.has('agency_admin')
+  const isSystemInspector = roleNames.has('system_inspector')
 
-  if (path === '/login') return redirectTo(request, isAdmin ? '/dashboard' : '/my-profile')
+  if (path === '/login') {
+    return redirectTo(request, isAdmin ? '/dashboard' : isSystemInspector ? '/inspections' : '/my-profile')
+  }
+
+  // A pure System Inspector gets an inspection-focused workspace. The role is
+  // intentionally not an administrative role and does not unlock Fleet,
+  // Personnel, Reports, Credentials, or Administration pages.
+  if (!isAdmin && isSystemInspector) {
+    if (path === '/') return redirectTo(request, '/inspections')
+    const inspectionPath = path === '/inspections' || path.startsWith('/inspections/')
+    const ownProfilePath = path === '/my-profile' && !!profile.provider_id
+    if (!inspectionPath && !ownProfilePath) return redirectTo(request, '/inspections')
+    return supabaseResponse
+  }
 
   // Provider-level accounts are self-service only. They cannot navigate to
   // dashboard/personnel lists/fleet/reports/administration, even by typing a URL.

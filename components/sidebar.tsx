@@ -18,9 +18,17 @@ const providerItems = [
   { href: '/my-profile', label: 'My Profile', icon: PeopleIcon },
 ]
 
-export function Sidebar({ providerOnly = false }: { providerOnly?: boolean }) {
+const inspectorItems = [
+  { href: '/inspections', label: 'Inspections', icon: ClipboardIcon },
+]
+
+export function Sidebar({ providerOnly = false, inspectorOnly = false, hasProvider = false }: { providerOnly?: boolean; inspectorOnly?: boolean; hasProvider?: boolean }) {
   const pathname = usePathname()
-  const items = providerOnly ? providerItems : adminItems
+  const items = providerOnly
+    ? providerItems
+    : inspectorOnly
+      ? [...inspectorItems, ...(hasProvider ? providerItems : [])]
+      : adminItems
   return <nav className="nav-list" aria-label="Primary">
     {items.map(({ href, label, icon: Icon }) => {
       const active = pathname === href || pathname.startsWith(`${href}/`)

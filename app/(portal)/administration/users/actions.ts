@@ -63,7 +63,7 @@ export async function saveUserRoles(formData: FormData) {
   const userId = value(formData, 'user_id')
   if (!userId) fail('/administration/users', 'User ID is required.')
   const requested = new Set(formData.getAll('roles').filter((x): x is string => typeof x === 'string'))
-  const allowed = ['provider','agency_admin','system_admin']
+  const allowed = ['provider','agency_admin','system_inspector','system_admin']
   const roles = allowed.filter((r) => requested.has(r))
   try {
     const { supabase, user } = await requireSystemAdmin()
