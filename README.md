@@ -1,16 +1,28 @@
-# GEAEMS Portal v0.3.3
+# GEAEMS Portal v0.3.4
 
-This release fixes Supabase SSR invite/password-recovery links so the intended user is authenticated before the password setup screen is shown.
+Hotfix for invite/password-reset session handoff.
 
-## Important: Supabase email template changes are REQUIRED
+## What changed
 
-The app now includes `GET /auth/confirm`, which verifies Supabase `TokenHash` values server-side and establishes the correct user's session cookie before redirecting to `/auth/setup-password`.
+`/auth/confirm` now creates the Supabase SSR client inside the Route Handler and writes the invite/recovery session cookies directly onto the redirect response that sends the user to `/auth/setup-password`.
 
-In **Supabase Dashboard → Authentication → Emails → Templates**, update these two templates.
+This fixes a failure mode where `verifyOtp()` succeeded but the following password-setup page did not receive the authenticated session and displayed:
 
-### Reset Password template
+> This setup link is invalid, has expired, or has not finished signing you in.
 
-The important part is that the button/link href is:
+The identity checks introduced in v0.3.1 remain in place. The password page still refuses to update a password unless the session user matches the user/provider encoded into the setup link.
+
+## Deployment
+
+No SQL migration is required.
+
+Replace the repository contents with v0.3.4 and deploy through Netlify.
+
+After deployment, send a **new** invitation or password setup email. Do not reuse a previously clicked/expired link because Supabase email tokens are one-time credentials.
+
+## Supabase email template links
+
+Reset Password:
 
 ```html
 <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next={{ .RedirectTo }}">
@@ -18,11 +30,7 @@ The important part is that the button/link href is:
 </a>
 ```
 
-You may keep your own surrounding HTML/branding.
-
-### Invite User template
-
-The important part is that the button/link href is:
+Invite User:
 
 ```html
 <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next={{ .RedirectTo }}">
@@ -30,35 +38,7 @@ The important part is that the button/link href is:
 </a>
 ```
 
-You may keep your own surrounding HTML/branding.
+Supabase Authentication URL Configuration should include:
 
-## Supabase URL configuration
-
-Under **Authentication → URL Configuration** confirm:
-
-```text
-Site URL:
-https://portal.geaemss.org
-```
-
-and an allowed redirect URL such as:
-
-```text
-https://portal.geaemss.org/**
-```
-
-## Why this change is needed
-
-GEAEMS administrators initiate invitations and recovery emails for other users from the server. A server-side `TokenHash` verification route is therefore safer and more reliable than assuming the recipient has an existing browser-side PKCE verifier.
-
-The confirm route only permits `invite` and `recovery` token types and only redirects to `/auth/setup-password` on the same portal origin.
-
-The password setup page still re-verifies the signed-in user's expected user/provider identity immediately before changing the password.
-
-## Deployment
-
-No new database migration is required.
-
-Replace the repo contents with this build and let Netlify redeploy.
-
-After deployment, update the two Supabase email templates above **before sending another test invitation/reset**. Old emails generated from the previous template should not be used for testing this flow.
+- Site URL: `https://portal.geaemss.org`
+- Redirect URL: `https://portal.geaemss.org/**`
