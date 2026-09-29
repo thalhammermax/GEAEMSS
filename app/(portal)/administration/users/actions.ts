@@ -35,7 +35,7 @@ export async function resendPasswordSetup(formData: FormData) {
     const admin = createAdminClient()
     const { data, error } = await admin.auth.admin.getUserById(userId)
     if (error || !data.user?.email) throw error ?? new Error('User email not found.')
-    await sendPasswordSetupEmail(data.user.email)
+    await sendPasswordSetupEmail(data.user.email, userId)
     redirect(`/administration/users/${userId}?notice=${encodeURIComponent('Password setup/reset email sent.')}`)
   } catch (error: any) {
     fail(`/administration/users/${userId}`, error?.message ?? 'Email could not be sent.')

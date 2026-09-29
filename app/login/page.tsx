@@ -1,12 +1,14 @@
 'use client'
 
 import { FormEvent, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BrandLogo } from '@/components/brand-logo'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const notice = searchParams.get('notice')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -38,6 +40,7 @@ export default function LoginPage() {
       <form onSubmit={submit} className="login-form">
         <label>Email address<input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
         <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+        {notice && <div className="form-success">{notice}</div>}
         {error && <div className="form-error">{error}</div>}
         <button className="primary-button" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
       </form>

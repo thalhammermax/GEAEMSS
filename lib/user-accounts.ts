@@ -63,7 +63,7 @@ export async function inviteProviderAccount(providerId: string) {
     if (roleError) throw roleError
 
     const { error: resetError } = await admin.auth.resetPasswordForEmail(provider.email, {
-      redirectTo: `${siteUrl()}/auth/setup-password`,
+      redirectTo: `${siteUrl()}/auth/setup-password?provider=${encodeURIComponent(provider.id)}`,
     })
     if (resetError) throw resetError
     return { userId: existingUser.id, mode: 'reset' as const }
@@ -71,7 +71,7 @@ export async function inviteProviderAccount(providerId: string) {
 
   const { data: invite, error: inviteError } = await admin.auth.admin.inviteUserByEmail(provider.email, {
     data: { display_name: displayName, provider_id: provider.id },
-    redirectTo: `${siteUrl()}/auth/setup-password`,
+    redirectTo: `${siteUrl()}/auth/setup-password?provider=${encodeURIComponent(provider.id)}`,
   })
   if (inviteError || !invite.user) throw inviteError ?? new Error('Supabase did not return the invited user.')
 
@@ -89,10 +89,10 @@ export async function inviteProviderAccount(providerId: string) {
   return { userId: invite.user.id, mode: 'invite' as const }
 }
 
-export async function sendPasswordSetupEmail(email: string) {
+export async function sendPasswordSetupEmail(email: string, expectedUserId: string) {
   const admin = createAdminClient()
   const { error } = await admin.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteUrl()}/auth/setup-password`,
+    redirectTo: `${siteUrl()}/auth/setup-password?uid=${encodeURIComponent(expectedUserId)}`,
   })
   if (error) throw error
 }

@@ -1,4 +1,11 @@
-# GEAEMS Portal v0.3
+# GEAEMS Portal v0.3.1
+
+## v0.3.1 password-setup safety fix
+
+This patch fixes a v0.3 bug where `/auth/setup-password` accepted any existing authenticated browser session and could therefore change the wrong user's password. Setup/reset links are now bound to the intended provider or Auth user, the identity is verified again immediately before the password change, and the recovery session is signed out after the password is saved.
+
+**Deploy this patch before sending additional account setup or password reset emails.** No additional SQL migration is required beyond the v0.3 `003_user_account_security.sql` migration.
+
 
 Greater Elgin Area EMS System personnel, credential, fleet, licensing and inspection compliance portal.
 
