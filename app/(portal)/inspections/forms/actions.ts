@@ -31,6 +31,29 @@ async function requireEditableVersion(supabase: Awaited<ReturnType<typeof create
   return version
 }
 
+
+export async function createAgencyInspectionForm(formData: FormData) {
+  const agencyId = value(formData, 'agency_id')
+  const vehicleTypeId = value(formData, 'vehicle_type_id')
+  const name = value(formData, 'name')
+  const description = value(formData, 'description')
+  const path = '/inspections/forms/new'
+  if (!agencyId || !vehicleTypeId || !name) fail(path, 'Agency, vehicle type, and form name are required.')
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('create_agency_inspection_form', {
+    p_agency_id: agencyId,
+    p_vehicle_type_id: vehicleTypeId,
+    p_name: name,
+    p_description: description || null,
+  })
+  if (error) fail(path, error.message)
+
+  const templateId = String(data)
+  revalidatePath('/inspections/forms')
+  redirect(`/inspections/forms/${templateId}?notice=${encodeURIComponent('Agency inspection form created. Build the draft checklist, then publish it when ready.')}`)
+}
+
 export async function updateInspectionFormTemplate(formData: FormData) {
   const templateId = value(formData, 'template_id')
   const path = `/inspections/forms/${templateId}`
