@@ -1,112 +1,94 @@
-# GEAEMS Portal v0.6.1
+# GEAEMS Portal v0.6.2
 
 Production URL: `https://portal.geaemss.org`
 
-v0.6.1 keeps the v0.6 Narcotics Management module and adds a **versioned Inspection Form Editor** plus stricter privacy for in-progress inspection drafts.
+v0.6.2 keeps the v0.6.1 inspection-form editor/draft privacy changes and revises **Narcotics Management** in three important ways:
 
-## Inspection form editor
+1. daily narcotics forms are assigned by **vehicle type**, not by agency default;
+2. incomplete daily narcotics counts are surfaced at the top of the Dashboard; and
+3. every narcotics count records a **Seal Number**, with a mandatory explanation when the seal changes from the immediately preceding submitted count for that apparatus.
 
-Go to:
-
-**Inspections → Manage forms**
-
-System Administrators can edit GEAEMS System inspection forms. Agency Administrators with Fleet management permission may edit agency-owned forms. System Inspectors can perform System inspections but cannot change form definitions.
-
-Published forms are immutable. Selecting an inspection form and choosing **Create editable draft** clones the current published checklist into a new draft version. In that draft you can:
-
-- rename sections and change their order;
-- add or delete sections;
-- add, edit, or delete inspection items;
-- change requirement text;
-- change item ordering;
-- choose required/optional status;
-- allow N/A responses where appropriate;
-- set failure severity and require deficiency comments;
-- use Compliance, Text, Number, Date, or Yes/No response types.
-
-Publishing the draft retires the previous published version for future inspections. Existing historical inspections remain permanently tied to the version that was used when they were performed.
-
-## Draft inspection privacy
-
-GEAEMS **System inspection drafts** are now returned only to:
-
-- System Inspectors; and
-- System Administrators.
-
-Agency Administrators do not receive in-progress System inspections in inspection-list queries and cannot open them directly. Once a System inspection is submitted, normal agency inspection-history access applies. Agency-owned form drafts remain available only to the agency users authorized to perform those agency inspections.
-
-
-## Daily narcotics counts
-
-- ALS and critical-care apparatus are automatically marked as requiring a daily count when they use the GEAEMS ALS / Critical Care vehicle types.
-- Other vehicles may be manually enabled from their Fleet record.
-- Providers can perform a count **only when their portal login is linked to an active provider affiliation with that vehicle's agency**.
-- Agency Administrator or System Administrator status by itself does not authorize an electronic count signature; the signer must also be an affiliated provider.
-- Each apparatus has one count record per calendar day.
-- Counts can be saved as drafts and resumed later.
-- Submitted counts are locked from editing.
-- Any actual quantity that differs from the template's expected quantity is automatically flagged as a discrepancy.
-
-## Electronic signature
-
-Submission requires:
-
-1. every active template item to have an actual count;
-2. the provider to type their name;
-3. the provider to accept the agency's electronic-signature attestation.
-
-The database records the authenticated user, linked provider, typed signature, timestamp, attestation, and a SHA-256 signature hash generated from the signed count snapshot.
-
-## Templates
+## Vehicle-type narcotics forms
 
 Go to:
 
-**Narcotics → Templates & settings**
+**Narcotics → Forms & settings**
 
-System Administrators can create GEAEMS System templates. Agency Administrators with **Narcotics** permission can create templates owned by their agency.
+System Administrators can assign a GEAEMS System narcotics form to each active vehicle type. Every apparatus automatically uses the form assigned to its current vehicle type.
 
-Each template item supports:
+Examples:
 
-- medication / controlled substance name;
-- concentration;
-- dosage form;
-- optional controlled-substance schedule label;
-- expected quantity;
-- unit label;
-- sort order.
+- `GEA ALS Ambulance` → `GEAEMS Standard ALS Narcotics`
+- `GEA ALS Non-Transport` → `GEAEMS ALS Non-Transport Narcotics`
+- `GEA Critical Care Transport` → `GEAEMS Critical Care Narcotics`
 
-An agency can select a default template. A Fleet record can optionally override that template for an individual apparatus.
+There is **no agency default narcotics form** in the v0.6.2 workflow, and the vehicle record no longer exposes a per-apparatus template selector. Existing v0.6 agency-default and vehicle-override assignments are cleared by migration 010, but all previously submitted narcotics counts retain the exact `template_id` snapshot they used.
 
-## Agency permissions
+The database columns from the original v0.6 implementation are retained for migration compatibility but are marked deprecated and are ignored by the current count workflow.
 
-Migration 008 adds two agency-access settings under User Management:
+## Seal Number workflow
 
-- **Narcotics** — allows that Agency Administrator to manage their agency's narcotics templates/settings.
-- **Narcotics email report** — includes that Agency Administrator on the automated incomplete-count report.
+Every daily narcotics count now includes:
 
-Existing Agency Administrator access rows default to receiving the report.
+- **Seal Number**
+- **Previous submitted Seal Number** (when one exists)
+- **Reason seal changed** (required only when the current seal differs from the previous submitted seal)
 
-## Automated incomplete-count report
+The count page shows the previous seal to the provider. As soon as the provider enters a different current seal, the UI displays and requires the reason field.
 
-The repository includes:
+The database independently enforces the same rule at final submission, so bypassing the browser cannot submit an unexplained seal change.
+
+The signed SHA-256 submission payload now includes the current seal, prior seal, and seal-change reason.
+
+Historical submitted counts created before v0.6.2 may not have a seal number. The first v0.6.2 submission for that apparatus establishes the baseline; subsequent changes require an explanation.
+
+## Dashboard incomplete-count alert
+
+The main Dashboard now displays a high-priority narcotics alert **above Personnel and Fleet** whenever a visible count-required apparatus does not have a submitted count for its agency's current local date.
+
+A count remains incomplete when it is:
+
+- not started;
+- saved as a draft but not signed/submitted; or
+- unable to start because its vehicle type has no narcotics form assigned.
+
+The alert is authorization-scoped automatically by Supabase RLS:
+
+- System Administrators see the system-wide apparatus they are authorized to view;
+- Agency Administrators see their authorized agencies;
+- providers continue to use the Narcotics module directly and do not gain administrative Dashboard access.
+
+The automated Agency Admin email report also distinguishes **No form configured for vehicle type**, **Draft not submitted**, and **Not started**.
+
+## Provider count authorization
+
+Providers may perform and electronically sign a narcotics count only when their login is linked to an active provider record that is actively affiliated with the apparatus agency for the count date.
+
+System/Agency administrative status alone does not authorize a signature.
+
+## Daily report settings
+
+Agency settings still control:
+
+- whether Narcotics Management is enabled for that agency;
+- agency time zone;
+- daily incomplete-count report hour;
+- whether the incomplete-count report is emailed; and
+- the electronic-signature attestation text.
+
+They no longer contain a default narcotics form selector.
+
+The scheduled Netlify function remains:
 
 `netlify/functions/narcotics-daily-report.mjs`
 
-It is a Netlify Scheduled Function that runs hourly. For each enabled agency, once the configured local report hour has passed, it checks every active apparatus requiring a narcotics count. If one or more do not have a **submitted** count for that local date, the function emails the Agency Administrators who have **Narcotics email report** enabled.
-
-A draft counts as incomplete until it is electronically signed and submitted.
-
-The function records successful or no-action daily runs in `narcotics_report_history` so an agency does not receive duplicate daily alerts.
-
-### Netlify environment variable required
-
-Add this server-side environment variable in Netlify:
+and continues to require:
 
 ```text
-RESEND_API_KEY=re_...
+NEXT_PUBLIC_SUPABASE_URL
+SUPABASE_SECRET_KEY
+RESEND_API_KEY
 ```
-
-You can use the same Resend API key that you configured as the SMTP password for Supabase Auth. Do **not** place it in GitHub or prefix it with `NEXT_PUBLIC_`.
 
 Optional sender override:
 
@@ -114,46 +96,35 @@ Optional sender override:
 NARCOTICS_REPORT_FROM=GEAEMS Portal <no-reply@auth.geaemss.org>
 ```
 
-The scheduled function also uses the existing:
+## Deploying v0.6.2
 
-```text
-NEXT_PUBLIC_SUPABASE_URL
-SUPABASE_SECRET_KEY
-```
-
-Ensure those variables and `RESEND_API_KEY` are available to Netlify Functions at runtime.
-
-## Deploying v0.6.1
-
-Your project should already have migrations `001` through `008` applied.
+Your project should already have migrations `001` through `009` applied.
 
 Run only:
 
 ```text
-supabase/migrations/009_inspection_form_editor_and_draft_privacy.sql
+supabase/migrations/010_narcotics_vehicle_type_forms_and_seals.sql
 ```
 
-in **Supabase → SQL Editor**. Do not rerun migrations 001–008.
+in **Supabase → SQL Editor**. Do not rerun migrations 001–009.
 
-Then replace/push the v0.6.1 application files to GitHub and allow Netlify to rebuild.
+Then push the v0.6.2 application files to GitHub and allow Netlify to rebuild.
 
-After deployment:
+### Required configuration after migration 010
 
-1. Open **Narcotics → Templates & settings**.
-2. Create at least one count template and add the medications/controlled substances to it.
-3. Assign a default template to each participating agency.
-4. Verify each ALS apparatus under **Fleet**. GEAEMS ALS/CC vehicle types are automatically count-required.
-5. In **Administration → User Management**, confirm which Agency Administrators should receive narcotics reports.
-6. Add `RESEND_API_KEY` to Netlify.
-7. In Netlify **Functions**, confirm `narcotics-daily-report` appears with a **Scheduled** badge. You can use **Run now** to test it without waiting for the schedule.
+Because v0.6.2 intentionally removes agency-default/vehicle-override form selection, configure the vehicle types before expecting providers to submit counts:
 
-## After deployment
+1. Open **Narcotics → Forms & settings** as a System Administrator.
+2. Create/edit the GEAEMS System narcotics count forms you need.
+3. Under **Daily narcotics form assignment**, assign the appropriate form to each ALS/critical-care vehicle type.
+4. Open **Fleet** and confirm the apparatus has the correct vehicle type and that daily narcotics counts are enabled.
+5. Perform a test count and enter a Seal Number.
+6. Submit a second test-day count with a different seal and confirm a change reason is required.
+7. Confirm an incomplete count appears at the top of the Dashboard until it is signed and submitted.
 
-1. Open **Inspections → Manage forms** as a System Administrator.
-2. Choose one of the five GEAEMS System forms.
-3. Click **Create editable draft**.
-4. Make a small test change, then publish the new version.
-5. Start a new inspection and confirm the new version is loaded.
-6. Save that inspection as a draft. Confirm that a System Inspector/System Administrator can see it and that an Agency Administrator cannot see or open it.
+## Inspection behavior retained from v0.6.1
 
-The System Inspector role from migration 007 remains the role used to perform GEAEMS System inspections. v0.6.1 changes only form administration and draft visibility; it does not broaden who can perform System inspections.
+- System Administrators can create versioned editable inspection-form drafts and publish new versions.
+- Published inspection versions remain immutable for historical integrity.
+- System inspection drafts are visible only to **System Inspectors** and **System Administrators**.
+- Agency Administrators do not receive in-progress System inspection drafts through normal queries or direct record access.

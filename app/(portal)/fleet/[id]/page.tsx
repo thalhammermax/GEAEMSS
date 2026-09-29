@@ -17,9 +17,9 @@ export default async function VehiclePage({ params, searchParams }: Props) {
   const [{ data: vehicle, error }, { data: agencies }, { data: types }, { data: statuses }, { data: narcoticsTemplates }, fieldResult, valueResult] = await Promise.all([
     supabase.from('vehicles').select('*, agencies(name, short_name), vehicle_types(name), vehicle_statuses(name)').eq('id', id).maybeSingle(),
     supabase.from('agencies').select('id, name').eq('active', true).order('name'),
-    supabase.from('vehicle_types').select('id, name').eq('active', true).order('sort_order'),
+    supabase.from('vehicle_types').select('id, name, narcotics_template_id').eq('active', true).order('sort_order'),
     supabase.from('vehicle_statuses').select('id, name').eq('active', true).order('sort_order'),
-    supabase.from('narcotics_count_templates').select('id, name, scope_type, agency_id').eq('active', true).order('name'),
+    supabase.from('narcotics_count_templates').select('id, name').eq('active', true).eq('scope_type', 'system').order('name'),
     fetchFieldDefinitions(supabase, 'vehicle'),
     fetchCustomFieldValues(supabase, id),
   ])
@@ -56,7 +56,10 @@ export default async function VehiclePage({ params, searchParams }: Props) {
         </div>
         {isEnabled(map,'notes') && <label className="field"><span>Notes{req('notes') ? ' *' : ''}</span><textarea name="notes" rows={3} defaultValue={vehicle.notes ?? ''} required={req('notes')} /></label>}
         <div className="form-section-divider"><span>Narcotics Management</span></div>
-        <div className="form-grid"><label className="checkbox-field"><input type="checkbox" name="narcotics_count_required" defaultChecked={vehicle.narcotics_count_required}/><span>Require a signed daily narcotics count for this apparatus</span></label><label className="field"><span>Count template override</span><select name="narcotics_template_id" defaultValue={vehicle.narcotics_template_id ?? ''}><option value="">Use agency default</option>{(narcoticsTemplates ?? []).filter((t:any) => t.scope_type === 'system' || t.agency_id === vehicle.agency_id).map((t:any) => <option key={t.id} value={t.id}>{t.name}{t.scope_type === 'system' ? ' · System' : ''}</option>)}</select></label></div>
+        <div className="form-grid">
+          <label className="checkbox-field"><input type="checkbox" name="narcotics_count_required" defaultChecked={vehicle.narcotics_count_required}/><span>Require a signed daily narcotics count for this apparatus</span></label>
+          <div className="field"><span>Daily count form</span><div className="readonly-field">{(() => { const currentType:any = (types ?? []).find((t:any) => t.id === vehicle.vehicle_type_id); const form:any = (narcoticsTemplates ?? []).find((t:any) => t.id === currentType?.narcotics_template_id); return form?.name || 'No form assigned to this vehicle type' })()}</div><small>Assigned automatically from the vehicle type in Narcotics → Forms & settings.</small></div>
+        </div>
         <CustomFieldInputs fields={custom} values={valueResult.values} />
         <div className="form-actions"><button className="primary-button" type="submit">Save changes</button></div>
       </form>

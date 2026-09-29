@@ -41,6 +41,8 @@ export async function saveNarcoticsCount(formData: FormData) {
     p_mode: mode,
     p_signature_name: text(formData, 'signature_name'),
     p_attestation: checked(formData, 'attestation'),
+    p_seal_number: text(formData, 'seal_number'),
+    p_seal_change_reason: text(formData, 'seal_change_reason'),
     p_lines: lines,
   })
   if (error) fail(path, error.message)
@@ -65,13 +67,27 @@ export async function saveNarcoticsAgencySettings(formData: FormData) {
     timezone: text(formData, 'timezone') || 'America/Chicago',
     report_hour: reportHour,
     send_incomplete_report: checked(formData, 'send_incomplete_report'),
-    default_template_id: text(formData, 'default_template_id') || null,
+    default_template_id: null,
     signature_attestation: text(formData, 'signature_attestation'),
   }, { onConflict: 'agency_id' })
   if (error) fail('/narcotics/settings', error.message)
   revalidatePath('/narcotics/settings')
   revalidatePath('/narcotics')
   redirect('/narcotics/settings?notice=' + encodeURIComponent('Agency narcotics settings saved.'))
+}
+
+
+export async function saveNarcoticsVehicleTypeTemplate(formData: FormData) {
+  const vehicleTypeId = text(formData, 'vehicle_type_id')
+  if (!vehicleTypeId) fail('/narcotics/settings', 'Vehicle type is required.')
+  const templateId = text(formData, 'narcotics_template_id') || null
+  const supabase = await createClient()
+  const { error } = await supabase.from('vehicle_types').update({ narcotics_template_id: templateId }).eq('id', vehicleTypeId)
+  if (error) fail('/narcotics/settings', error.message)
+  revalidatePath('/narcotics/settings')
+  revalidatePath('/narcotics')
+  revalidatePath('/dashboard')
+  redirect('/narcotics/settings?notice=' + encodeURIComponent('Vehicle type narcotics form assignment saved.'))
 }
 
 export async function createNarcoticsTemplate(formData: FormData) {

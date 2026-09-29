@@ -36,8 +36,6 @@ async function vehiclePayload(supabase: any, formData: FormData, path: string) {
   }
 
   payload.narcotics_count_required = formData.get('narcotics_count_required') === 'on'
-  const narcoticsTemplateId = textValue(formData, 'narcotics_template_id')
-  payload.narcotics_template_id = narcoticsTemplateId || null
 
   return payload
 }

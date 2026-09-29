@@ -29,7 +29,7 @@ export default async () => {
     const { data: prior } = await db.from('narcotics_report_history').select('id').eq('agency_id', setting.agency_id).eq('report_date', now.date).eq('report_type', 'incomplete_daily_count').maybeSingle()
     if (prior) continue
 
-    const { data: vehicles, error: vehicleError } = await db.from('vehicles').select('id, unit_number, fleet_number').eq('agency_id', setting.agency_id).eq('active', true).eq('narcotics_count_required', true).order('unit_number')
+    const { data: vehicles, error: vehicleError } = await db.from('vehicles').select('id, unit_number, fleet_number, vehicle_types(narcotics_template_id)').eq('agency_id', setting.agency_id).eq('active', true).eq('narcotics_count_required', true).order('unit_number')
     if (vehicleError) throw vehicleError
     const ids = (vehicles ?? []).map((v) => v.id)
     const { data: counts, error: countError } = ids.length ? await db.from('narcotics_counts').select('vehicle_id, status').in('vehicle_id', ids).eq('count_date', now.date) : { data: [], error: null }
@@ -66,7 +66,7 @@ export default async () => {
     }
 
     const agency = Array.isArray(setting.agencies) ? setting.agencies[0] : setting.agencies
-    const rows = missing.map((v) => `<tr><td style="padding:8px;border-bottom:1px solid #ddd">${esc(v.unit_number || v.fleet_number || 'Unnumbered')}</td><td style="padding:8px;border-bottom:1px solid #ddd">${drafts.has(v.id) ? 'Draft not submitted' : 'Not started'}</td></tr>`).join('')
+    const rows = missing.map((v) => { const type = Array.isArray(v.vehicle_types) ? v.vehicle_types[0] : v.vehicle_types; const status = !type?.narcotics_template_id ? 'No form configured for vehicle type' : drafts.has(v.id) ? 'Draft not submitted' : 'Not started'; return `<tr><td style="padding:8px;border-bottom:1px solid #ddd">${esc(v.unit_number || v.fleet_number || 'Unnumbered')}</td><td style="padding:8px;border-bottom:1px solid #ddd">${esc(status)}</td></tr>` }).join('')
     const subject = `Incomplete narcotics counts - ${agency?.short_name || agency?.name || 'Agency'} - ${now.date}`
     const html = `<div style="font-family:Arial,sans-serif;color:#17212b"><h2>GEAEMS Narcotics Count Report</h2><p>The following apparatus do not have a submitted narcotics count for <strong>${esc(now.date)}</strong>.</p><table style="border-collapse:collapse;width:100%;max-width:640px"><thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid #999">Apparatus</th><th style="text-align:left;padding:8px;border-bottom:2px solid #999">Status</th></tr></thead><tbody>${rows}</tbody></table><p style="margin-top:20px"><a href="https://portal.geaemss.org/narcotics">Open GEAEMS Portal</a></p></div>`
     const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to: uniqueEmails, subject, html }) })
