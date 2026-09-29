@@ -1,6 +1,13 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+function redirectTo(request: NextRequest, pathname: string) {
+  const url = request.nextUrl.clone()
+  url.pathname = pathname
+  url.search = ''
+  return NextResponse.redirect(url)
+}
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -30,16 +37,30 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
   const isPublic = path.startsWith('/login') || path.startsWith('/auth')
 
-  if (!user && !isPublic) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
-  }
+  if (!user && !isPublic) return redirectTo(request, '/login')
+  if (!user) return supabaseResponse
 
-  if (user && path === '/login') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+  // Public auth routes must remain reachable while an invite/recovery session is active.
+  if (path.startsWith('/auth')) return supabaseResponse
+
+  const [{ data: roles }, { data: profile }] = await Promise.all([
+    supabase.from('user_roles').select('role').eq('user_id', user.id),
+    supabase.from('profiles').select('active, provider_id').eq('id', user.id).maybeSingle(),
+  ])
+
+  if (!profile || profile.active === false) return redirectTo(request, '/auth/disabled')
+
+  const roleNames = new Set((roles ?? []).map((row: { role: string }) => row.role))
+  const isAdmin = roleNames.has('system_admin') || roleNames.has('agency_admin')
+
+  if (path === '/login') return redirectTo(request, isAdmin ? '/dashboard' : '/my-profile')
+
+  // Provider-level accounts are self-service only. They cannot navigate to
+  // dashboard/personnel lists/fleet/reports/administration, even by typing a URL.
+  if (!isAdmin) {
+    if (!profile.provider_id) return redirectTo(request, '/auth/disabled')
+    if (path !== '/my-profile' && path !== '/') return redirectTo(request, '/my-profile')
+    if (path === '/') return redirectTo(request, '/my-profile')
   }
 
   return supabaseResponse

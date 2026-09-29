@@ -74,6 +74,12 @@ export async function saveUserRoles(formData: FormData) {
       const { error: insertError } = await supabase.from('user_roles').insert(roles.map((role) => ({ user_id: userId, role })))
       if (insertError) throw insertError
     }
+    // Agency permission rows are meaningful only for Agency Administrators.
+    // Clear them on demotion so stale permissions cannot later become active unexpectedly.
+    if (!roles.includes('agency_admin')) {
+      const { error: accessDeleteError } = await supabase.from('user_agency_access').delete().eq('user_id', userId)
+      if (accessDeleteError) throw accessDeleteError
+    }
     revalidatePath('/administration/users')
     revalidatePath(`/administration/users/${userId}`)
     redirect(`/administration/users/${userId}?notice=${encodeURIComponent('Roles updated.')}`)
@@ -88,6 +94,14 @@ export async function saveAgencyAccess(formData: FormData) {
   if (!userId || !agencyId) fail('/administration/users', 'User and agency are required.')
   try {
     const { supabase } = await requireSystemAdmin()
+    const { data: agencyAdminRole, error: roleError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'agency_admin')
+      .maybeSingle()
+    if (roleError) throw roleError
+    if (!agencyAdminRole) throw new Error('Agency permissions can only be assigned to a user with the Agency Administrator role.')
     if (checked(formData, 'enabled')) {
       const { error } = await supabase.from('user_agency_access').upsert({
         user_id: userId,
