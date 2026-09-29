@@ -10,6 +10,11 @@ function one<T = any>(value: T | T[] | null | undefined): T | null {
 }
 function displayAgency(agency: any) { return agency?.short_name || agency?.name || '' }
 function fullName(provider: any) { return [provider?.last_name, provider?.first_name].filter(Boolean).join(', ') }
+function dateInZone(value: string | null | undefined, timeZone = 'America/Chicago') {
+  if (!value) return ''
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date(value)).filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]))
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
 function agencyScope(scope?: ReportScope) { return scope && !scope.isSystemAdmin ? scope.agencyIds : null }
 
 async function allowedProviderIds(supabase: SupabaseClient, scope?: ReportScope) {
@@ -289,6 +294,62 @@ async function inspectionDeficiencyRows(supabase: SupabaseClient, scope?: Report
   return (data ?? []).filter((row: any) => { const inspection = one<any>(row.vehicle_inspections); const vehicle = one<any>(inspection?.vehicles); return allowed === null || (allowed.includes(vehicle?.agency_id) && inspection?.workflow_status === 'submitted') }).map((row: any) => { const inspection = one<any>(row.vehicle_inspections); const vehicle = one<any>(inspection?.vehicles); return { inspection_date: inspection?.inspection_date || null, agency: displayAgency(one(vehicle?.agencies)), unit_number: vehicle?.unit_number || vehicle?.fleet_number || '', description: row.description, severity: row.severity, status: row.status, correction_due_date: row.correction_due_date, corrected_at: row.corrected_at, correction_notes: row.correction_notes } })
 }
 
+async function ceCompletionRows(supabase: SupabaseClient, scope?: ReportScope): Promise<ReportRow[]> {
+  const permitted = await allowedProviderIds(supabase, scope)
+  if (permitted !== null && permitted.length === 0) return []
+
+  let attendanceQuery = supabase.from('ce_attendance').select('provider_id, verified_at, verification_method, credit_hours_awarded, ce_sessions(start_at, timezone, location_name, ce_courses(title, course_code, category))').eq('status', 'completed').limit(20000)
+  let externalQuery = supabase.from('ce_external_submissions').select('provider_id, title, sponsor, category, completion_date, credit_hours, reviewed_at').eq('status', 'approved').limit(20000)
+  if (permitted !== null) {
+    attendanceQuery = attendanceQuery.in('provider_id', permitted)
+    externalQuery = externalQuery.in('provider_id', permitted)
+  }
+  const [attendanceResult, externalResult] = await Promise.all([attendanceQuery, externalQuery])
+  if (attendanceResult.error) throw attendanceResult.error
+  if (externalResult.error) throw externalResult.error
+
+  const providerIds = [...new Set([...(attendanceResult.data ?? []).map((row:any) => row.provider_id), ...(externalResult.data ?? []).map((row:any) => row.provider_id)])]
+  const ctx = await providerContext(supabase, providerIds, scope)
+  const rows: ReportRow[] = []
+  for (const row of attendanceResult.data ?? []) {
+    const session = one<any>(row.ce_sessions); const course = one<any>(session?.ce_courses)
+    rows.push({
+      provider_name: ctx.get(row.provider_id)?.provider_name || '', agencies: ctx.get(row.provider_id)?.agencies || '',
+      completion_date: dateInZone(session?.start_at, session?.timezone || 'America/Chicago'), course_title: course?.title || 'GEAEMS CE Session',
+      course_code: course?.course_code || '', category: course?.category || '', delivery_source: 'Instructor-led',
+      sponsor_or_location: session?.location_name || 'GEAEMS', credit_hours: Number(row.credit_hours_awarded || 0),
+      verification_method: row.verification_method || 'code', verified_at: row.verified_at,
+    })
+  }
+  for (const row of externalResult.data ?? []) rows.push({
+    provider_name: ctx.get(row.provider_id)?.provider_name || '', agencies: ctx.get(row.provider_id)?.agencies || '',
+    completion_date: row.completion_date, course_title: row.title, course_code: '', category: row.category || '', delivery_source: 'External / online',
+    sponsor_or_location: row.sponsor || '', credit_hours: Number(row.credit_hours || 0), verification_method: 'Certificate review', verified_at: row.reviewed_at,
+  })
+  return rows
+}
+
+async function ceAttendanceRows(supabase: SupabaseClient, scope?: ReportScope): Promise<ReportRow[]> {
+  const permitted = await allowedProviderIds(supabase, scope)
+  if (permitted !== null && permitted.length === 0) return []
+  let query = supabase.from('ce_attendance').select('provider_id, status, source, checked_in_at, verified_at, verification_method, credit_hours_awarded, ce_sessions(start_at, timezone, location_name, ce_courses(title, course_code, category))').limit(20000)
+  if (permitted !== null) query = query.in('provider_id', permitted)
+  const { data, error } = await query
+  if (error) throw error
+  const providerIds = [...new Set((data ?? []).map((row:any) => row.provider_id))]
+  const ctx = await providerContext(supabase, providerIds, scope)
+  return (data ?? []).map((row:any) => {
+    const session = one<any>(row.ce_sessions); const course = one<any>(session?.ce_courses)
+    return {
+      provider_name: ctx.get(row.provider_id)?.provider_name || '', agencies: ctx.get(row.provider_id)?.agencies || '',
+      session_date: dateInZone(session?.start_at, session?.timezone || 'America/Chicago'), course_title: course?.title || 'GEAEMS CE Session',
+      course_code: course?.course_code || '', category: course?.category || '', location: session?.location_name || '',
+      attendance_status: row.status, checked_in_at: row.checked_in_at, verified_at: row.verified_at,
+      verification_method: row.verification_method || '', entry_source: row.source, credit_hours: row.credit_hours_awarded == null ? null : Number(row.credit_hours_awarded),
+    }
+  })
+}
+
 async function narcoticsRows(supabase: SupabaseClient, scope?: ReportScope): Promise<ReportRow[]> {
   let query = supabase.from('narcotics_counts').select('agency_id, count_date, has_discrepancy, seal_number, prior_seal_number, seal_change_reason, signed_name, signed_at, vehicles(unit_number, fleet_number, agencies(name, short_name)), narcotics_count_templates(name)').eq('status', 'submitted').order('count_date', { ascending: false }).limit(10000)
   const allowed = agencyScope(scope); if (allowed !== null) { if (!allowed.length) return []; query = query.in('agency_id', allowed) }
@@ -363,6 +424,8 @@ export async function runReport(supabase: SupabaseClient, definition: ReportDefi
     case 'inspection_compliance': rows = await inspectionComplianceRows(supabase, scope); break
     case 'inspection_history': rows = await inspectionHistoryRows(supabase, scope); break
     case 'inspection_deficiencies': rows = await inspectionDeficiencyRows(supabase, scope); break
+    case 'ce_completions': rows = await ceCompletionRows(supabase, scope); break
+    case 'ce_attendance_history': rows = await ceAttendanceRows(supabase, scope); break
     case 'narcotics_history': rows = await narcoticsRows(supabase, scope); break
     case 'agency_compliance_summary': rows = await agencyComplianceRows(supabase, scope); break
     default: throw new Error('Unsupported report data source.')

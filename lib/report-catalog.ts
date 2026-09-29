@@ -209,6 +209,38 @@ export const REPORT_SOURCES: ReportSource[] = [
     ]
   },
   {
+    key: 'ce_completions', label: 'CE Completion History', description: 'Completed continuing education from verified GEAEMS sessions and approved external certificates.', fields: [
+      { key: 'provider_name', label: 'Provider Name', type: 'text', default: true },
+      { key: 'agencies', label: 'Agencies', type: 'text', default: true },
+      { key: 'completion_date', label: 'Completion Date', type: 'date', default: true },
+      { key: 'course_title', label: 'Course / Training', type: 'text', default: true },
+      { key: 'course_code', label: 'Course Code', type: 'text' },
+      { key: 'category', label: 'Category', type: 'text', default: true },
+      { key: 'delivery_source', label: 'Source', type: 'text', default: true },
+      { key: 'sponsor_or_location', label: 'Sponsor / Location', type: 'text' },
+      { key: 'credit_hours', label: 'CE Hours', type: 'number', default: true },
+      { key: 'verification_method', label: 'Verification Method', type: 'text' },
+      { key: 'verified_at', label: 'Verified / Approved At', type: 'date' },
+    ]
+  },
+  {
+    key: 'ce_attendance_history', label: 'CE Session Attendance', description: 'Attendance status, check-in, verification, and awarded credit for scheduled GEAEMS CE sessions.', fields: [
+      { key: 'provider_name', label: 'Provider Name', type: 'text', default: true },
+      { key: 'agencies', label: 'Agencies', type: 'text', default: true },
+      { key: 'session_date', label: 'Session Date', type: 'date', default: true },
+      { key: 'course_title', label: 'CE Class', type: 'text', default: true },
+      { key: 'course_code', label: 'Course Code', type: 'text' },
+      { key: 'category', label: 'Category', type: 'text' },
+      { key: 'location', label: 'Location', type: 'text', default: true },
+      { key: 'attendance_status', label: 'Attendance Status', type: 'text', default: true },
+      { key: 'checked_in_at', label: 'Checked In At', type: 'date' },
+      { key: 'verified_at', label: 'Verified At', type: 'date' },
+      { key: 'verification_method', label: 'Verification Method', type: 'text' },
+      { key: 'entry_source', label: 'Entry Source', type: 'text' },
+      { key: 'credit_hours', label: 'CE Hours', type: 'number', default: true },
+    ]
+  },
+  {
     key: 'narcotics_history', label: 'Narcotics Count History', description: 'Submitted narcotics counts available to System and Agency Administration.', fields: [
       { key: 'count_date', label: 'Count Date', type: 'date', default: true },
       { key: 'agency', label: 'Agency', type: 'text', default: true },
@@ -250,6 +282,8 @@ export const BUILTIN_REPORTS: BuiltInReport[] = [
   { key: 'upcoming-inspections', name: 'Upcoming / Overdue Inspections', description: 'Inspection due dates and current inspection compliance.', definition: { dataSource: 'inspection_compliance', columns: ['agency','unit_number','inspection_name','latest_inspection_date','latest_result','next_due_date','compliance_status','days_until_due'], filters: [{ field:'compliance_status', operator:'not_equals', value:'CURRENT' }], sortField: 'next_due_date', sortDirection: 'asc' } },
   { key: 'inspection-history', name: 'Inspection History', description: 'Submitted vehicle inspections visible within your administrative scope.', definition: { dataSource: 'inspection_history', columns: ['inspection_date','agency','unit_number','inspection_type','result','inspector_name','submitted_at'], filters: [{ field:'workflow_status', operator:'equals', value:'submitted' }], sortField: 'inspection_date', sortDirection: 'desc' } },
   { key: 'open-inspection-deficiencies', name: 'Open Inspection Deficiencies', description: 'Vehicle inspection deficiencies that have not been closed.', definition: { dataSource: 'inspection_deficiencies', columns: ['inspection_date','agency','unit_number','description','severity','status','correction_due_date'], filters: [{ field:'status', operator:'equals', value:'open' }], sortField: 'correction_due_date', sortDirection: 'asc' } },
+  { key: 'ce-completion-history', name: 'CE Completion History', description: 'Verified instructor-led and approved external CE completion history.', definition: { dataSource: 'ce_completions', columns: ['provider_name','agencies','completion_date','course_title','category','delivery_source','credit_hours','verification_method'], filters: [], sortField: 'completion_date', sortDirection: 'desc' } },
+  { key: 'ce-session-attendance', name: 'CE Session Attendance', description: 'Scheduled CE attendance showing check-in and completion status.', definition: { dataSource: 'ce_attendance_history', columns: ['provider_name','agencies','session_date','course_title','location','attendance_status','checked_in_at','verified_at','credit_hours'], filters: [], sortField: 'session_date', sortDirection: 'desc' } },
   { key: 'narcotics-count-history', name: 'Narcotics Count History', description: 'Submitted daily narcotics count history, including seal changes and discrepancies.', definition: { dataSource: 'narcotics_history', columns: ['count_date','agency','unit_number','form_name','seal_number','prior_seal_number','signed_name','signed_at','has_discrepancy'], filters: [], sortField: 'count_date', sortDirection: 'desc' } },
   { key: 'system-compliance-summary', name: 'System Compliance Summary', description: 'System-wide compliance summary by agency for personnel, credentials, fleet and inspections.', definition: { dataSource: 'agency_compliance_summary', columns: ['agency','active_providers','credential_issues','active_vehicles','vehicle_license_issues','inspection_issues','open_deficiencies'], filters: [], sortField: 'agency', sortDirection: 'asc' } },
   { key: 'agency-compliance-summary', name: 'Agency Compliance Summary', description: 'High-level personnel, credential, fleet and inspection compliance by agency.', definition: { dataSource: 'agency_compliance_summary', columns: ['agency','active_providers','credential_issues','active_vehicles','vehicle_license_issues','inspection_issues','open_deficiencies'], filters: [], sortField: 'agency', sortDirection: 'asc' } },

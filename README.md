@@ -1,106 +1,142 @@
-# GEAEMS Portal v0.8.0
+# GEAEMS Portal v0.9.0
 
 Production portal: `https://portal.geaemss.org`
 
-v0.8 adds the provider credential self-service and verification workflow. It retains the Reporting, Personnel, Fleet, Inspections, Narcotics, Administration, user-management, and security functionality from v0.7.
+v0.9 adds the **Continuing Education (CE) Tracking** module while retaining Personnel, Credentials, Fleet, Inspections, Narcotics, Reports, Administration, and the v0.8 credential self-service workflow.
 
-## New in v0.8
+## New in v0.9 — CE Tracking
 
-### Provider credential self-service
-Providers can now manage credentials from **My Profile**.
+### CE roles
+System Administration can now assign two CE-specific roles:
 
-The compliance list shows an action for each applicable requirement:
+- **CE Coordinator** — creates CE classes, schedules dates/locations, reviews external CE certificates, manages any CE roster, and assigns instructors.
+- **CE Instructor** — manages attendance, manual roster entry, and end-of-session completion codes for sessions to which the instructor is assigned.
 
-- **Add credential** when a required credential is missing
-- **Renew** when a verified credential already exists
-- **Continue** for a saved draft or a submission returned for corrections
-- **View submission** while a credential is awaiting verification
+System Administrators have CE Coordinator authority automatically.
 
-Providers may also use **My Profile -> Add credential** to submit an active GEAEMS System credential or an agency-owned credential available through one of their active agency affiliations.
+A CE Coordinator or CE Instructor does not need a linked provider record just to administer CE. If the account is also linked to a provider, it retains normal provider self-service access as well.
 
-### Safe submission lifecycle
-Credential submissions now support:
+### Classes with multiple dates and locations
+A CE class is created once with its title, course code, category, description, and default CE hours. The CE Coordinator can then add any number of scheduled sessions beneath that class.
+
+Each session stores its own:
+
+- date and start/end time
+- time zone
+- location name and address/room/link
+- optional capacity
+- optional CE-hour override
+- self check-in setting
+- check-in opening window
+- completion-code validity window
+- instructor assignments
+- session notes and status
+
+This allows one class to be offered repeatedly on different dates and at different locations while keeping a separate attendance roster for every offering.
+
+### Provider electronic check-in
+Providers see upcoming CE offerings under **CE Tracking**.
+
+During the configured check-in window they can select **Check in**. The database validates the session time, self-check-in setting, provider linkage, and optional capacity before creating the attendance record.
+
+Checking in does **not** award CE credit by itself.
+
+### Random end-of-session completion code
+At the end of class, a CE Coordinator or assigned CE Instructor selects **Generate & release code**.
+
+The portal generates a random six-character code. The secret value is stored separately from the provider-readable session record so providers cannot retrieve it from normal session queries.
+
+A provider who already checked in enters the code in the portal. A successful match changes the attendance record to **Completed** and awards the session CE hours. The verification timestamp and method are retained for auditing.
+
+### Manual roster entry
+CE Coordinators and assigned CE Instructors can enter attendance manually from a paper roster or make a roster correction.
+
+The roster screen provides a system-provider directory, optional notes, and the ability to mark the provider complete and award the class credit. Electronic and manual entries appear together on the same authoritative session roster.
+
+### Electronic roster generation
+Every CE session has a roster that can be:
+
+- viewed in the portal
+- downloaded as CSV
+- printed
+
+The generated roster includes provider name, System ID, agency, attendance status, check-in/verification times, verification method, entry source, CE hours, and notes.
+
+### External / online CE certificates
+Provider self-service now supports CE completed outside the GEAEMS electronic attendance workflow.
+
+Examples include online mandated reporter training or another outside CE course that provides a completion certificate.
+
+Providers enter:
+
+- training/course title
+- sponsor/provider
+- category
+- completion date
+- CE hours (0 is allowed for tracked training that does not award hours)
+- notes
+- completion certificate
+
+Certificates are stored in a private Supabase Storage bucket named:
 
 ```text
-Draft
-  -> Pending verification
-  -> Approved
-  -> Rejected
-  -> Changes requested -> provider edits -> Pending verification
+ce-certificates
 ```
 
-A provider may save an incomplete draft without affecting the verified credential already on file. The current verified credential remains authoritative until a replacement is approved.
+Accepted formats are PDF, JPG, PNG, and WebP up to 10 MB.
 
-Credential definitions control whether the provider must enter:
+External CE remains **Pending** until a CE Coordinator or System Administrator approves or rejects it. Approved CE becomes part of the provider's transcript.
 
-- credential number
-- issue date
-- expiration date
-- supporting document
-- administrator verification
+Standing licenses/certifications such as BLS, ACLS, PALS, or a state license should still be tracked in the **Credentials** module rather than submitted as CE.
 
-If a credential definition has **Verification required = Off**, a valid provider submission is automatically accepted into the verified credential history. If verification is required, the submission enters the administrator review queue.
+### Provider CE transcript
+**CE Tracking → My transcript** combines:
 
-### Supporting credential documents
-Migration 016 creates a private Supabase Storage bucket named:
+- verified instructor-led GEAEMS attendance
+- approved external/online CE certificates
 
-```text
-credential-documents
-```
+Providers can view total hours, category totals, print the transcript, or download it as CSV.
 
-Providers can attach PDF, JPG, PNG, or WebP files up to 10 MB. Storage access is protected by Supabase RLS. Providers can only upload documents to their own editable credential submissions. Administrators can only read documents for credential records within their current authorization scope.
+### Reports integration
+The v0.7 custom report engine now includes CE data sources:
 
-### Credential verification queue
-Administrators now have:
+- **CE Completion History**
+- **CE Session Attendance**
 
-**Credentials -> Review submissions**
+Standard CE Completion History and CE Session Attendance reports are also included. Because they use the existing report engine, they can be customized, filtered, saved, exported, and scheduled for emailed delivery.
 
-The queue shows provider-submitted credentials that are pending or have changes requested.
-
-The review screen shows:
-
-- provider identity
-- submitted credential number/dates
-- provider notes
-- supporting document(s)
-- the currently verified credential, if one exists
-
-Authorized administrators can:
-
-- **Approve credential**
-- **Request changes** with instructions to the provider
-- **Reject** with a required reason
-
-Approval creates a new current verified credential, supersedes the prior current record, preserves historical credential data, and moves the uploaded document metadata to the verified credential record.
-
-Existing credential-scope authorization remains in effect: System Administrators can review all accessible submissions, while Agency Administrators are limited by their current credential-management permissions and agency scope.
+Agency Administrator report scope remains limited to providers within the administrator's currently authorized agencies. System Administrators can report system-wide.
 
 ## Database migration
 
-If migrations `001` through `015` are already installed, run only:
+If migrations `001` through `016` are already installed, run only:
 
 ```text
-supabase/migrations/016_provider_credential_self_service.sql
+supabase/migrations/017_ce_tracking.sql
 ```
 
 Do not rerun prior migrations.
 
-Migration 016:
+Migration 017:
 
-- adds credential-submission drafts and provider notes
-- creates the private `credential-documents` Storage bucket
-- adds Storage RLS policies
-- validates required fields/documents before final submission
-- adds automatic acceptance for credential definitions that do not require verification
-- preserves provider notes when an administrator approves a credential
+- adds `ce_coordinator` and `ce_instructor` roles
+- creates CE course, session, instructor-assignment, attendance, and external-submission tables
+- creates secure CE completion-code handling
+- creates the private `ce-certificates` Storage bucket and RLS policies
+- adds provider self check-in and code-verification RPCs
+- adds manual roster and limited provider/instructor directory RPCs
+- adds external CE review functions
+- extends report-safe CE visibility to current agency administrative scope
 
 ## Deploy
 
-1. Run `supabase/migrations/016_provider_credential_self_service.sql` in Supabase SQL Editor.
-2. Replace the GitHub repository contents with this version.
-3. Push/commit to the production branch.
-4. Let Netlify build and deploy.
-5. Sign in as a Provider and open **My Profile** to test an Add Credential submission.
-6. Sign in as a System Administrator and open **Credentials -> Review submissions** to approve the test credential.
+1. Run `supabase/migrations/017_ce_tracking.sql` in the Supabase SQL Editor.
+2. Commit/deploy this version from GitHub.
+3. Let Netlify build and deploy.
+4. In **Administration → Users**, assign at least one **CE Coordinator** and **CE Instructor** as appropriate.
+5. Create a CE class under **CE Tracking → Manage classes** and add two test sessions with different dates/locations.
+6. Assign a CE Instructor to a session.
+7. Test provider check-in, instructor code release, provider completion verification, and roster export.
+8. Test an external CE certificate upload and approval.
 
-No new Netlify environment variables are required for v0.8.
+No new Netlify environment variables are required for v0.9.

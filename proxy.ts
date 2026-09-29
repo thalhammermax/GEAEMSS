@@ -16,18 +16,12 @@ export async function proxy(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
+        getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet, headers) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-          Object.entries(headers).forEach(([key, value]) =>
-            supabaseResponse.headers.set(key, value)
-          )
+          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
+          Object.entries(headers).forEach(([key, value]) => supabaseResponse.headers.set(key, value))
         },
       },
     }
@@ -39,54 +33,43 @@ export async function proxy(request: NextRequest) {
 
   if (!user && !isPublic) return redirectTo(request, '/login')
   if (!user) return supabaseResponse
-
-  // Public auth routes must remain reachable while an invite/recovery session is active.
   if (path.startsWith('/auth')) return supabaseResponse
 
   const [{ data: roles }, { data: profile }] = await Promise.all([
     supabase.from('user_roles').select('role').eq('user_id', user.id),
     supabase.from('profiles').select('active, provider_id').eq('id', user.id).maybeSingle(),
   ])
-
   if (!profile || profile.active === false) return redirectTo(request, '/auth/disabled')
 
   const roleNames = new Set((roles ?? []).map((row: { role: string }) => row.role))
   const isAdmin = roleNames.has('system_admin') || roleNames.has('agency_admin')
   const isSystemInspector = roleNames.has('system_inspector')
+  const hasCERole = roleNames.has('ce_coordinator') || roleNames.has('ce_instructor')
+  const hasProvider = !!profile.provider_id
 
-  if (path === '/login') {
-    return redirectTo(request, isAdmin ? '/dashboard' : isSystemInspector ? '/inspections' : '/my-profile')
-  }
+  const defaultPath = isAdmin ? '/dashboard'
+    : isSystemInspector ? '/inspections'
+    : hasCERole ? '/ce'
+    : hasProvider ? '/my-profile'
+    : '/auth/disabled'
 
-  // A pure System Inspector gets an inspection-focused workspace. The role is
-  // intentionally not an administrative role and does not unlock Fleet,
-  // Personnel, Reports, Credentials, or Administration pages.
-  if (!isAdmin && isSystemInspector) {
-    if (path === '/') return redirectTo(request, '/inspections')
-    const inspectionPath = path === '/inspections' || path.startsWith('/inspections/')
-    const ownProfilePath = !!profile.provider_id && (path === '/my-profile' || path.startsWith('/my-profile/'))
-    const narcoticsPath = !!profile.provider_id && (path === '/narcotics' || path.startsWith('/narcotics/'))
-    if (!inspectionPath && !ownProfilePath && !narcoticsPath) return redirectTo(request, '/inspections')
-    return supabaseResponse
-  }
+  if (path === '/login' || path === '/') return redirectTo(request, defaultPath)
+  if (isAdmin) return supabaseResponse
 
-  // Provider-level accounts are self-service users, but they also participate
-  // in daily narcotics counts for apparatus belonging to agencies where they
-  // have an active provider affiliation. Administrative narcotics routes still
-  // enforce their own role checks server-side.
-  if (!isAdmin) {
-    if (!profile.provider_id) return redirectTo(request, '/auth/disabled')
-    const ownProfilePath = path === '/my-profile' || path.startsWith('/my-profile/')
-    const narcoticsPath = path === '/narcotics' || path.startsWith('/narcotics/')
-    if (!ownProfilePath && !narcoticsPath && path !== '/') return redirectTo(request, '/my-profile')
-    if (path === '/') return redirectTo(request, '/my-profile')
-  }
+  const inspectionPath = path === '/inspections' || path.startsWith('/inspections/')
+  const cePath = path === '/ce' || path.startsWith('/ce/')
+  const ownProfilePath = path === '/my-profile' || path.startsWith('/my-profile/')
+  const narcoticsPath = path === '/narcotics' || path.startsWith('/narcotics/')
 
+  const allowed = (isSystemInspector && inspectionPath)
+    || (cePath && (hasCERole || hasProvider))
+    || (hasProvider && ownProfilePath)
+    || (hasProvider && narcoticsPath)
+
+  if (!allowed) return redirectTo(request, defaultPath)
   return supabaseResponse
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }

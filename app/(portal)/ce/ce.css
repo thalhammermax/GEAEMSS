@@ -1,0 +1,13 @@
+/* Continuing Education */
+.banner.info { background:#eef5fb; color:var(--navy-3); border:1px solid #cddfeb; }
+.summary-strip small { display:block; color:#8d99a4; margin-top:3px; font-size:10px; }
+.review-card-list { display:grid; gap:14px; }
+
+@media print {
+  .sidebar, button, .header-actions, .form-actions, .print-hide { display:none !important; }
+  .portal-shell { display:block; }
+  .portal-main { padding:0; }
+  .page-header { margin-bottom:18px; }
+  .table-card, .panel, .report-card { box-shadow:none; }
+  body { background:#fff; }
+}
