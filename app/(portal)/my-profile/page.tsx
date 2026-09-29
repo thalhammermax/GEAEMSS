@@ -7,15 +7,11 @@ import { fetchCustomFieldValues, fetchFieldDefinitions } from '@/lib/record-fiel
 
 export const metadata: Metadata = { title: 'My Profile' }
 
-function credentialState(expiration: string | null) {
-  if (!expiration) return { label: 'Current', className: 'green' }
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const end = new Date(`${expiration}T12:00:00`)
-  const days = Math.ceil((end.getTime() - today.getTime()) / 86400000)
-  if (days < 0) return { label: 'Expired', className: 'red' }
-  if (days <= 30) return { label: `${days}d`, className: 'red' }
-  if (days <= 90) return { label: `${days}d`, className: 'amber' }
-  return { label: 'Current', className: 'green' }
+function statusStyle(status:string) {
+  if (status === 'CURRENT') return { label: 'Current', className: 'green' }
+  if (status === 'EXPIRING_SOON') return { label: 'Expiring soon', className: 'amber' }
+  if (status === 'EXPIRED') return { label: 'Expired', className: 'red' }
+  return { label: 'Missing', className: 'red' }
 }
 
 function displayCustomValue(value: unknown) {
@@ -38,12 +34,14 @@ export default async function MyProfilePage() {
     { data: provider, error },
     { data: affiliations },
     { data: credentials },
+    { data: compliance },
     { fields },
     { values: customValues },
   ] = await Promise.all([
     supabase.from('providers').select('id, provider_number, first_name, middle_name, last_name, preferred_name, email, phone, system_entry_date, provider_level_id, provider_status_id, provider_levels(name), provider_statuses(name)').eq('id', id).maybeSingle(),
     supabase.from('provider_agencies').select('id, employee_id, start_date, end_date, is_primary, active, agencies(id, name, short_name), provider_levels:agency_provider_level_id(name)').eq('provider_id', id).order('active', { ascending: false }).order('is_primary', { ascending: false }).order('start_date', { ascending: false }),
-    supabase.from('provider_credentials').select('id, credential_number, issue_date, expiration_date, is_current, verification_status, credential_types(name, category)').eq('provider_id', id).eq('is_current', true).eq('verification_status', 'verified').order('expiration_date'),
+    supabase.from('provider_credentials').select('id, credential_number, issue_date, expiration_date, is_current, verification_status, credential_types(name, category, scope_type, agencies(name, short_name))').eq('provider_id', id).eq('is_current', true).eq('verification_status', 'verified').order('expiration_date'),
+    supabase.from('provider_compliance').select('*').eq('provider_id', id).order('credential_name'),
     fetchFieldDefinitions(supabase, 'provider'),
     fetchCustomFieldValues(supabase, id),
   ])
@@ -51,10 +49,11 @@ export default async function MyProfilePage() {
   if (error || !provider) redirect('/auth/disabled')
   const affiliationRows = (affiliations ?? []) as any[]
   const credentialRows = (credentials ?? []) as any[]
+  const complianceRows = (compliance ?? []) as any[]
   const visibleCustomFields = fields.filter((field) => field.source_type === 'custom' && field.enabled && customValues.has(field.id))
 
   return <>
-    <PageHeader eyebrow="Provider Self-Service" title="My Profile" description="Your GEAEMS System provider record. Contact System Administration if information needs to be corrected." />
+    <PageHeader eyebrow="Provider Self-Service" title="My Profile" description="Your GEAEMS System provider record and credential compliance." />
 
     <div className="profile-grid">
       <section className="panel profile-summary">
@@ -70,13 +69,18 @@ export default async function MyProfilePage() {
       </section>
 
       <section className="panel">
-        <div className="panel-heading"><h3>Current credentials</h3><span>{credentialRows.length} records</span></div>
-        {credentialRows.length === 0 ? <div className="empty-state compact"><strong>No credentials entered</strong><span>No verified current credentials are on your provider record.</span></div> : <div className="credential-mini-list">{credentialRows.map((credential) => {
-          const state = credentialState(credential.expiration_date)
-          return <div key={credential.id}><div><strong>{credential.credential_types?.name}</strong><span>{credential.credential_number || credential.credential_types?.category || ''}</span></div><div className="credential-date"><span>{formatDate(credential.expiration_date)}</span><span className={`pill ${state.className}`}>{state.label}</span></div></div>
+        <div className="panel-heading"><h3>Required credential compliance</h3><span>{complianceRows.length} requirement{complianceRows.length === 1 ? '' : 's'}</span></div>
+        {complianceRows.length === 0 ? <div className="empty-state compact"><strong>No credential requirements assigned</strong><span>System and agency requirements that apply to you will appear here.</span></div> : <div className="credential-mini-list">{complianceRows.map((row:any) => {
+          const state = statusStyle(row.compliance_status)
+          return <div key={row.credential_type_id}><div><strong>{row.credential_name}</strong><span>{row.credential_scope_type === 'agency' ? 'Agency credential' : 'GEAEMS System credential'}</span></div><div className="credential-date"><span>{row.expiration_date ? formatDate(row.expiration_date) : row.compliance_status === 'MISSING' ? 'No record' : 'No expiration'}</span><span className={`pill ${state.className}`}>{state.label}</span></div></div>
         })}</div>}
       </section>
     </div>
+
+    <section className="section-block">
+      <div className="section-title"><div><span>Credentials</span><h2>My current credential records</h2></div><div className="section-badge">{credentialRows.length}</div></div>
+      <div className="table-card">{credentialRows.length === 0 ? <div className="empty-state compact"><strong>No current credentials entered</strong></div> : <table><thead><tr><th>Credential</th><th>Owner</th><th>Number</th><th>Issue</th><th>Expiration</th></tr></thead><tbody>{credentialRows.map((r:any) => <tr key={r.id}><td><strong>{r.credential_types?.name}</strong><div className="muted-code">{r.credential_types?.category || ''}</div></td><td>{r.credential_types?.scope_type === 'agency' ? (r.credential_types?.agencies?.short_name || r.credential_types?.agencies?.name || 'Agency') : 'GEAEMS System'}</td><td>{r.credential_number || '—'}</td><td>{formatDate(r.issue_date)}</td><td>{formatDate(r.expiration_date)}</td></tr>)}</tbody></table>}</div>
+    </section>
 
     <section className="section-block">
       <div className="section-title"><div><span>Affiliations</span><h2>My agencies</h2></div><div className="section-badge">{affiliationRows.filter((a) => a.active).length} active</div></div>

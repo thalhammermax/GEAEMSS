@@ -24,12 +24,13 @@ export default async function ProviderPage({ params, searchParams }: Props) {
   const { id } = await params
   const qs = await searchParams
   const supabase = await createClient()
-  const [{ data: provider, error }, { data: affiliations }, { data: agencies }, { data: levels }, { data: credentials }] = await Promise.all([
+  const [{ data: provider, error }, { data: affiliations }, { data: agencies }, { data: levels }, { data: credentials }, { data: compliance }] = await Promise.all([
     supabase.from('providers').select('*, provider_levels(name), provider_statuses(name)').eq('id', id).maybeSingle(),
     supabase.from('provider_agencies').select('id, agency_id, employee_id, start_date, end_date, is_primary, active, agencies(id, name, short_name), provider_levels:agency_provider_level_id(name)').eq('provider_id', id).order('active', { ascending: false }).order('is_primary', { ascending: false }).order('start_date', { ascending: false }),
     supabase.from('agencies').select('id, name').eq('active', true).order('name'),
     supabase.from('provider_levels').select('id, name').eq('active', true).order('sort_order'),
-    supabase.from('provider_credentials').select('id, credential_number, issue_date, expiration_date, is_current, verification_status, credential_types(name, category)').eq('provider_id', id).eq('is_current', true).eq('verification_status', 'verified').order('expiration_date'),
+    supabase.from('provider_credentials').select('id, credential_number, issue_date, expiration_date, is_current, verification_status, credential_types(name, category, scope_type, agencies(name, short_name))').eq('provider_id', id).eq('is_current', true).eq('verification_status', 'verified').order('expiration_date'),
+    supabase.from('provider_compliance').select('*').eq('provider_id', id).order('credential_name'),
   ])
   if (error || !provider) notFound()
 
@@ -37,6 +38,7 @@ export default async function ProviderPage({ params, searchParams }: Props) {
   const activeAgencyIds = new Set(affiliationRows.filter((a) => a.active).map((a) => a.agency_id))
   const availableAgencies = (agencies ?? []).filter((a) => !activeAgencyIds.has(a.id))
   const credentialRows = (credentials ?? []) as any[]
+  const complianceRows = (compliance ?? []) as any[]
 
   return <>
     <PageHeader eyebrow="Personnel" title={`${provider.first_name} ${provider.last_name}`} description={`${provider.provider_levels?.name ?? 'Provider'} · ${provider.provider_number || 'No system ID assigned'}`} action={<Link className="primary-button small button-link" href={`/personnel/${provider.id}/edit`}>Edit provider</Link>} />
@@ -60,10 +62,10 @@ export default async function ProviderPage({ params, searchParams }: Props) {
       </section>
 
       <section className="panel">
-        <div className="panel-heading"><h3>Current credentials</h3><span>{credentialRows.length} records</span></div>
-        {credentialRows.length === 0 ? <div className="empty-state compact"><strong>No credentials entered</strong><span>Credential entry and renewal workflows are the next module.</span></div> : <div className="credential-mini-list">{credentialRows.map((credential) => {
-          const state = credentialState(credential.expiration_date)
-          return <div key={credential.id}><div><strong>{credential.credential_types?.name}</strong><span>{credential.credential_number || credential.credential_types?.category || ''}</span></div><div className="credential-date"><span>{formatDate(credential.expiration_date)}</span><span className={`pill ${state.className}`}>{state.label}</span></div></div>
+        <div className="panel-heading"><h3>Credential compliance</h3><span>{complianceRows.length} requirements · {credentialRows.length} current records</span></div>
+        {complianceRows.length === 0 ? <div className="empty-state compact"><strong>No credential requirements assigned</strong><span>System-wide and agency requirements that apply to this provider will appear here.</span></div> : <div className="credential-mini-list">{complianceRows.map((row:any) => {
+          const state = row.compliance_status === 'CURRENT' ? { label: 'Current', className: 'green' } : row.compliance_status === 'EXPIRING_SOON' ? { label: 'Expiring soon', className: 'amber' } : row.compliance_status === 'EXPIRED' ? { label: 'Expired', className: 'red' } : { label: 'Missing', className: 'red' }
+          return <div key={row.credential_type_id}><div><strong>{row.credential_name}</strong><span>{row.credential_scope_type === 'agency' ? 'Agency credential' : 'GEAEMS System credential'}</span></div><div className="credential-date"><span>{row.expiration_date ? formatDate(row.expiration_date) : row.compliance_status === 'MISSING' ? 'No record' : 'No expiration'}</span><span className={`pill ${state.className}`}>{state.label}</span></div></div>
         })}</div>}
       </section>
     </div>
