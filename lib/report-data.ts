@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { sourceFor, type ReportDefinition, type ReportField, type ReportFilter } from './report-catalog'
+import { sourceAvailableForModules, sourceFor, sourceRequiredModules, type ReportDefinition, type ReportField, type ReportFilter } from './report-catalog'
+import { enabledModuleKeys, getModuleStates, moduleLabel, type ModuleKey } from './modules'
 
 export type ReportRow = Record<string, any>
 export type CustomReportField = ReportField & { customFieldId?: string }
@@ -78,22 +79,28 @@ async function providerContext(supabase: SupabaseClient, providerIds: string[], 
   return map
 }
 
-async function loadCustomFields(supabase: SupabaseClient, entityType: 'provider' | 'agency' | 'vehicle') {
+async function loadCustomFields(supabase: SupabaseClient, entityType: 'provider' | 'agency' | 'vehicle', module?: ModuleKey) {
   const { data: defs } = await supabase.from('record_field_definitions').select('id, label, field_type, field_key, sort_order').eq('entity_type', entityType).eq('source_type', 'custom').eq('enabled', true).order('sort_order')
   return (defs ?? []).map((def: any): CustomReportField => ({
     key: `custom:${def.id}`,
     label: def.label,
     type: def.field_type === 'number' ? 'number' : def.field_type === 'date' ? 'date' : def.field_type === 'boolean' ? 'boolean' : 'text',
     customFieldId: def.id,
+    module,
   }))
 }
 
-export async function reportFieldsForSource(supabase: SupabaseClient, sourceKey: string) {
+export async function reportFieldsForSource(supabase: SupabaseClient, sourceKey: string, enabledModules?: Set<ModuleKey>) {
   const base = sourceFor(sourceKey)?.fields ?? []
-  if (sourceKey === 'personnel') return [...base, ...(await loadCustomFields(supabase, 'provider'))]
-  if (sourceKey === 'agencies') return [...base, ...(await loadCustomFields(supabase, 'agency'))]
-  if (sourceKey === 'fleet') return [...base, ...(await loadCustomFields(supabase, 'vehicle'))]
-  return base
+  let fields: CustomReportField[] = [...base]
+  if (sourceKey === 'personnel') fields = [...fields, ...(await loadCustomFields(supabase, 'provider', 'personnel'))]
+  if (sourceKey === 'agencies') fields = [...fields, ...(await loadCustomFields(supabase, 'agency'))]
+  if (sourceKey === 'fleet') fields = [...fields, ...(await loadCustomFields(supabase, 'vehicle', 'fleet'))]
+  if (sourceKey === 'vehicle_operations') fields = [...fields, ...(await loadCustomFields(supabase, 'vehicle', 'fleet'))]
+  if (sourceKey === 'provider_operations') fields = [...fields, ...(await loadCustomFields(supabase, 'provider', 'personnel'))]
+
+  const enabled = enabledModules ?? new Set(enabledModuleKeys(await getModuleStates(supabase)))
+  return fields.filter((field) => !field.module || enabled.has(field.module))
 }
 
 async function addCustomValues(supabase: SupabaseClient, rows: ReportRow[], entityIds: string[], fields: CustomReportField[]) {
@@ -264,6 +271,241 @@ async function fleetRows(supabase: SupabaseClient, fields: CustomReportField[], 
   return rows
 }
 
+
+async function vehicleOperationsRows(
+  supabase: SupabaseClient,
+  fields: CustomReportField[],
+  scope: ReportScope | undefined,
+  enabledModules: Set<ModuleKey>
+): Promise<ReportRow[]> {
+  const rows = await fleetRows(supabase, fields, scope)
+  const ids = rows.map((row: any) => row.__entity_id).filter(Boolean)
+  if (!ids.length) return rows
+
+  const [complianceResult, historyResult, deficienciesResult, narcoticsResult] = await Promise.all([
+    supabase
+      .from('vehicle_inspection_compliance')
+      .select('vehicle_id, inspection_name, latest_inspection_date, latest_result, next_due_date, compliance_status, days_until_due')
+      .in('vehicle_id', ids)
+      .limit(20000),
+    supabase
+      .from('vehicle_inspections')
+      .select('vehicle_id, inspection_date, result, inspector_name, submitted_at, inspection_types(name)')
+      .in('vehicle_id', ids)
+      .eq('workflow_status', 'submitted')
+      .order('inspection_date', { ascending: false })
+      .order('submitted_at', { ascending: false })
+      .limit(20000),
+    supabase
+      .from('vehicle_inspection_deficiencies')
+      .select('severity, status, vehicle_inspections(vehicle_id, workflow_status)')
+      .eq('status', 'open')
+      .limit(20000),
+    enabledModules.has('narcotics')
+      ? supabase
+          .from('narcotics_counts')
+          .select('vehicle_id, count_date, seal_number, signed_name, has_discrepancy')
+          .in('vehicle_id', ids)
+          .eq('status', 'submitted')
+          .order('count_date', { ascending: false })
+          .order('signed_at', { ascending: false })
+          .limit(20000)
+      : Promise.resolve({ data: [] as any[], error: null } as any),
+  ])
+
+  if (complianceResult.error) throw complianceResult.error
+  if (historyResult.error) throw historyResult.error
+  if (deficienciesResult.error) throw deficienciesResult.error
+  if (narcoticsResult.error) throw narcoticsResult.error
+
+  const statusRank: Record<string, number> = {
+    FAILED: 60,
+    OVERDUE: 50,
+    MISSING: 40,
+    SCHEDULE_MISSING: 35,
+    DUE_SOON: 20,
+    CURRENT: 10,
+  }
+
+  const inspection = new Map<string, any>()
+  for (const item of complianceResult.data ?? []) {
+    const current = inspection.get(item.vehicle_id) || {
+      requirementCount: 0,
+      issueCount: 0,
+      overdueCount: 0,
+      failedCount: 0,
+      missingCount: 0,
+      worstStatus: '',
+      worstRank: -1,
+      nextDue: null as string | null,
+    }
+    current.requirementCount += 1
+    if (item.compliance_status !== 'CURRENT') current.issueCount += 1
+    if (item.compliance_status === 'OVERDUE') current.overdueCount += 1
+    if (item.compliance_status === 'FAILED') current.failedCount += 1
+    if (item.compliance_status === 'MISSING' || item.compliance_status === 'SCHEDULE_MISSING') current.missingCount += 1
+    const rank = statusRank[item.compliance_status] ?? 0
+    if (rank > current.worstRank) {
+      current.worstRank = rank
+      current.worstStatus = item.compliance_status
+    }
+    if (item.next_due_date && (!current.nextDue || item.next_due_date < current.nextDue)) current.nextDue = item.next_due_date
+    inspection.set(item.vehicle_id, current)
+  }
+
+  const latestInspection = new Map<string, any>()
+  for (const item of historyResult.data ?? []) {
+    if (!latestInspection.has(item.vehicle_id)) latestInspection.set(item.vehicle_id, item)
+  }
+
+  const deficiency = new Map<string, { open: number; critical: number }>()
+  const idSet = new Set(ids)
+  for (const item of deficienciesResult.data ?? []) {
+    const vi = one<any>(item.vehicle_inspections)
+    if (!vi?.vehicle_id || !idSet.has(vi.vehicle_id) || vi.workflow_status !== 'submitted') continue
+    const current = deficiency.get(vi.vehicle_id) || { open: 0, critical: 0 }
+    current.open += 1
+    if (item.severity === 'critical') current.critical += 1
+    deficiency.set(vi.vehicle_id, current)
+  }
+
+  const latestNarcotics = new Map<string, any>()
+  for (const item of narcoticsResult.data ?? []) {
+    if (!latestNarcotics.has(item.vehicle_id)) latestNarcotics.set(item.vehicle_id, item)
+  }
+
+  return rows.map((row: any) => {
+    const id = row.__entity_id
+    const compliance = inspection.get(id) || {}
+    const latest = latestInspection.get(id)
+    const deficiencies = deficiency.get(id) || { open: 0, critical: 0 }
+    const narcotics = latestNarcotics.get(id)
+
+    return {
+      ...row,
+      inspection_requirement_count: compliance.requirementCount ?? 0,
+      inspection_issue_count: compliance.issueCount ?? 0,
+      inspection_compliance_status: compliance.worstStatus || (compliance.requirementCount ? 'CURRENT' : 'NO REQUIREMENT'),
+      next_inspection_due: compliance.nextDue ?? null,
+      latest_inspection_date: latest?.inspection_date ?? null,
+      latest_inspection_type: one<any>(latest?.inspection_types)?.name || '',
+      latest_inspection_result: latest?.result ?? null,
+      latest_inspector: latest?.inspector_name ?? '',
+      overdue_inspection_count: compliance.overdueCount ?? 0,
+      failed_inspection_count: compliance.failedCount ?? 0,
+      missing_inspection_count: compliance.missingCount ?? 0,
+      open_deficiency_count: deficiencies.open,
+      critical_deficiency_count: deficiencies.critical,
+      latest_narcotics_count_date: narcotics?.count_date ?? null,
+      latest_narcotics_seal: narcotics?.seal_number ?? '',
+      latest_narcotics_signed_by: narcotics?.signed_name ?? '',
+      latest_narcotics_discrepancy: narcotics?.has_discrepancy ?? null,
+    }
+  })
+}
+
+async function providerOperationsRows(
+  supabase: SupabaseClient,
+  fields: CustomReportField[],
+  scope: ReportScope | undefined,
+  enabledModules: Set<ModuleKey>
+): Promise<ReportRow[]> {
+  const rows = await personnelRows(supabase, fields, scope)
+  const ids = rows.map((row: any) => row.__entity_id).filter(Boolean)
+  if (!ids.length) return rows
+
+  const credentialEnabled = enabledModules.has('credentials')
+  const ceEnabled = enabledModules.has('ce')
+
+  const [complianceResult, submissionsResult, ceAttendanceResult, ceExternalResult] = await Promise.all([
+    credentialEnabled
+      ? supabase.from('provider_compliance').select('provider_id, expiration_date, compliance_status').in('provider_id', ids).limit(30000)
+      : Promise.resolve({ data: [] as any[], error: null } as any),
+    credentialEnabled
+      ? supabase.from('credential_submissions').select('provider_id, status').in('provider_id', ids).eq('status', 'pending').limit(20000)
+      : Promise.resolve({ data: [] as any[], error: null } as any),
+    ceEnabled
+      ? supabase.from('ce_attendance').select('provider_id, credit_hours_awarded, ce_sessions(start_at, timezone)').in('provider_id', ids).eq('status', 'completed').limit(30000)
+      : Promise.resolve({ data: [] as any[], error: null } as any),
+    ceEnabled
+      ? supabase.from('ce_external_submissions').select('provider_id, completion_date, credit_hours, status').in('provider_id', ids).in('status', ['approved','pending']).limit(30000)
+      : Promise.resolve({ data: [] as any[], error: null } as any),
+  ])
+
+  for (const result of [complianceResult, submissionsResult, ceAttendanceResult, ceExternalResult]) {
+    if (result.error) throw result.error
+  }
+
+  const credentials = new Map<string, any>()
+  for (const item of complianceResult.data ?? []) {
+    const current = credentials.get(item.provider_id) || {
+      required: 0, issues: 0, missing: 0, expired: 0, expiring: 0, pending: 0, nextExpiration: null as string | null,
+    }
+    current.required += 1
+    if (item.compliance_status !== 'CURRENT') current.issues += 1
+    if (item.compliance_status === 'MISSING') current.missing += 1
+    if (item.compliance_status === 'EXPIRED') current.expired += 1
+    if (item.compliance_status === 'EXPIRING_SOON') current.expiring += 1
+    if (item.expiration_date && (!current.nextExpiration || item.expiration_date < current.nextExpiration)) current.nextExpiration = item.expiration_date
+    credentials.set(item.provider_id, current)
+  }
+  for (const item of submissionsResult.data ?? []) {
+    const current = credentials.get(item.provider_id) || {
+      required: 0, issues: 0, missing: 0, expired: 0, expiring: 0, pending: 0, nextExpiration: null as string | null,
+    }
+    current.pending += 1
+    credentials.set(item.provider_id, current)
+  }
+
+  const ce = new Map<string, any>()
+  const cutoff = new Date()
+  cutoff.setFullYear(cutoff.getFullYear() - 1)
+  const cutoffDate = cutoff.toISOString().slice(0, 10)
+
+  function addCE(providerId: string, completionDate: string | null, hours: number, approved = true) {
+    const current = ce.get(providerId) || { total: 0, last12: 0, completions: 0, latest: null as string | null, pending: 0 }
+    if (!approved) {
+      current.pending += 1
+      ce.set(providerId, current)
+      return
+    }
+    current.total += hours
+    current.completions += 1
+    if (completionDate && completionDate >= cutoffDate) current.last12 += hours
+    if (completionDate && (!current.latest || completionDate > current.latest)) current.latest = completionDate
+    ce.set(providerId, current)
+  }
+
+  for (const item of ceAttendanceResult.data ?? []) {
+    const session = one<any>(item.ce_sessions)
+    addCE(item.provider_id, session?.start_at ? dateInZone(session.start_at, session?.timezone || 'America/Chicago') : null, Number(item.credit_hours_awarded || 0))
+  }
+  for (const item of ceExternalResult.data ?? []) {
+    if (item.status === 'pending') addCE(item.provider_id, item.completion_date, 0, false)
+    else addCE(item.provider_id, item.completion_date, Number(item.credit_hours || 0))
+  }
+
+  return rows.map((row: any) => {
+    const credential = credentials.get(row.__entity_id) || {}
+    const education = ce.get(row.__entity_id) || {}
+    return {
+      ...row,
+      required_credential_count: credential.required ?? 0,
+      credential_issue_count: credential.issues ?? 0,
+      missing_credential_count: credential.missing ?? 0,
+      expired_credential_count: credential.expired ?? 0,
+      expiring_credential_count: credential.expiring ?? 0,
+      pending_credential_submissions: credential.pending ?? 0,
+      next_credential_expiration: credential.nextExpiration ?? null,
+      ce_total_hours: Number(education.total ?? 0),
+      ce_hours_12_months: Number(education.last12 ?? 0),
+      ce_completion_count: education.completions ?? 0,
+      latest_ce_date: education.latest ?? null,
+      pending_external_ce: education.pending ?? 0,
+    }
+  })
+}
+
 async function vehicleLicenseRows(supabase: SupabaseClient, scope?: ReportScope): Promise<ReportRow[]> {
   let query = supabase.from('vehicle_license_compliance').select('*').limit(10000)
   const allowed = agencyScope(scope); if (allowed !== null) { if (!allowed.length) return []; query = query.in('agency_id', allowed) }
@@ -409,7 +651,17 @@ function sortRows(rows: ReportRow[], field?: string, direction: 'asc' | 'desc' =
 }
 
 export async function runReport(supabase: SupabaseClient, definition: ReportDefinition, scope?: ReportScope) {
-  const fields = await reportFieldsForSource(supabase, definition.dataSource)
+  const moduleStates = await getModuleStates(supabase)
+  const enabledModules = new Set(enabledModuleKeys(moduleStates))
+  if (!sourceAvailableForModules(definition.dataSource, enabledModules)) {
+    const required = sourceRequiredModules(definition.dataSource)
+      .filter((module) => !enabledModules.has(module))
+      .map(moduleLabel)
+      .join(', ')
+    throw new Error(`This report dataset is unavailable because these modules are disabled: ${required || 'required module'}.`)
+  }
+
+  const fields = await reportFieldsForSource(supabase, definition.dataSource, enabledModules)
   let rows: ReportRow[]
   switch (definition.dataSource) {
     case 'personnel': rows = await personnelRows(supabase, fields, scope); break
@@ -420,6 +672,8 @@ export async function runReport(supabase: SupabaseClient, definition: ReportDefi
     case 'credential_submissions': rows = await credentialSubmissionRows(supabase, scope); break
     case 'credential_type_census': rows = await credentialTypeCensusRows(supabase, scope); break
     case 'fleet': rows = await fleetRows(supabase, fields, scope); break
+    case 'vehicle_operations': rows = await vehicleOperationsRows(supabase, fields, scope, enabledModules); break
+    case 'provider_operations': rows = await providerOperationsRows(supabase, fields, scope, enabledModules); break
     case 'vehicle_license_compliance': rows = await vehicleLicenseRows(supabase, scope); break
     case 'inspection_compliance': rows = await inspectionComplianceRows(supabase, scope); break
     case 'inspection_history': rows = await inspectionHistoryRows(supabase, scope); break

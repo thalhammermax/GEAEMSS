@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { requireReportAdmin } from '@/lib/report-auth'
 import { runReport } from '@/lib/report-data'
-import { sourceFor, type ReportDefinition, type ReportFilter } from '@/lib/report-catalog'
+import { sourceAvailableForModules, sourceFor, sourceRequiredModules, type ReportDefinition, type ReportFilter } from '@/lib/report-catalog'
+import { enabledModuleKeys, getModuleStates, moduleLabel } from '@/lib/modules'
 
 function cleanText(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : ''
@@ -66,6 +67,12 @@ export async function saveReportAction(input: ReportDefinition) {
     }
 
     const { supabase, user } = await requireReportAdmin()
+    const moduleStates = await getModuleStates(supabase)
+    const enabledModules = new Set(enabledModuleKeys(moduleStates))
+    if (!sourceAvailableForModules(definition.dataSource, enabledModules)) {
+      const missing = sourceRequiredModules(definition.dataSource).filter((module) => !enabledModules.has(module)).map(moduleLabel).join(', ')
+      throw new Error(`This report cannot be saved while these modules are disabled: ${missing || 'required module'}.`)
+    }
     const payload = {
       name: definition.name,
       description: definition.description || null,

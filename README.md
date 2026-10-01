@@ -1,8 +1,89 @@
-# GEAEMS Portal v0.9.2
+# GEAEMS Portal v0.10.0
 
-Production portal: `https://portal.geaemss.org`
+v0.10 adds staged **module rollout controls** and **multi-module reporting**. The initial production configuration enables Fleet, Inspections, and Reports while Personnel, Credentials, CE Tracking, and Narcotics remain disabled until GEAEMS is ready to roll them out.
 
-v0.9.2 adds a System Administrator editor for the inspection PDF presentation template. It retains downloadable inspection PDFs, completed inspection history on Vehicle records, the v0.9 **Continuing Education (CE) Tracking** module, and the existing Personnel, Credentials, Fleet, Narcotics, Reports, and Administration functionality.
+
+## New in v0.10 — Staged module rollout & multi-module reports
+
+### Module rollout controls
+
+System Administrators now have **Administration → Module Controls**.
+
+The following modules can be enabled or disabled independently:
+
+- Personnel
+- Credentials
+- CE Tracking
+- Fleet
+- Inspections
+- Narcotics
+- Reports
+
+The v0.10 migration initializes the staged rollout requested for production:
+
+- **Fleet — enabled**
+- **Inspections — enabled**
+- **Reports — enabled**
+- Personnel — disabled
+- Credentials — disabled
+- CE Tracking — disabled
+- Narcotics — disabled
+
+Dashboard and Administration remain core portal services and cannot be disabled.
+
+Disabling a module does not delete its records. It hides the module from normal navigation, blocks non-System Administrators from its routes, and pauses module-specific scheduled activity. System Administrators retain maintenance access so future modules can be prepared before rollout.
+
+Dependencies are enforced:
+
+- Inspections requires Fleet.
+- Narcotics requires Fleet.
+- Credentials requires Personnel.
+- CE Tracking requires Personnel.
+
+### Multi-module report builder
+
+Reports remain enabled during the initial rollout.
+
+The report builder now supports safe **combined datasets** instead of forcing every report to come from only one module.
+
+**Vehicle + Inspection Operations** creates one row per vehicle and combines fields from:
+
+- Fleet
+- Inspection compliance
+- Latest completed inspection
+- Open/critical inspection deficiencies
+- Narcotics summary fields automatically appear later when Narcotics is enabled
+- Vehicle custom fields
+
+This allows reports such as:
+
+- every apparatus with its latest inspection result and next due date
+- vehicle roster with open/critical deficiency counts
+- fleet grouped by agency with inspection compliance status
+- apparatus with overdue/missing inspections
+
+**Provider + Credential + CE Overview** creates one row per provider and combines:
+
+- Personnel
+- Credential compliance summary fields when Credentials is enabled
+- CE totals/history summary fields when CE Tracking is enabled
+- Provider custom fields
+
+The combined datasets intentionally aggregate one-to-many relationships so the report builder does not create accidental cartesian duplicates.
+
+Existing single-module report datasets remain available when their required modules are enabled.
+
+Scheduled reports re-check both the report owner's current access and the current module rollout settings before each delivery. If a required module has been disabled, the scheduled run is skipped rather than exposing disabled-module data.
+
+### Database migration
+
+If migrations `001` through `018` are already installed, run only:
+
+```text
+supabase/migrations/019_module_rollout_and_multimodule_reports.sql
+```
+
+Migration 019 also updates the saved-report data-source constraint to include the CE report sources introduced in v0.9 and the new combined report datasets.
 
 ## New in v0.9.2 — Editable inspection PDF template
 

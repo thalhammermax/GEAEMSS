@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { csvForReport, runReport, type ReportScope } from '../../lib/report-data'
-import type { ReportDefinition } from '../../lib/report-catalog'
+import { sourceAvailableForModules, sourceRequiredModules, type ReportDefinition } from '../../lib/report-catalog'
+import { enabledModuleKeys, getModuleStates, moduleLabel } from '../../lib/modules'
 
 function zonedParts(timeZone:string, date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', hour12:false, hourCycle:'h23' }).formatToParts(date)
@@ -57,6 +58,9 @@ export default async () => {
   const portalUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://portal.geaemss.org'
   if (!url || !secret || !resend) throw new Error('Scheduled reports are missing required environment variables.')
   const db = createClient(url,secret,{auth:{persistSession:false,autoRefreshToken:false}})
+  const moduleStates = await getModuleStates(db)
+  if (!moduleStates.reports) return new Response('reports module disabled')
+  const enabledModules = new Set(enabledModuleKeys(moduleStates))
   const { data:reports, error } = await db.from('saved_reports').select('*').eq('schedule_enabled',true)
   if (error) throw error
 
@@ -69,6 +73,13 @@ export default async () => {
     if (prior) continue
 
     const recipients = [...new Set((report.schedule_recipients ?? []).map((v:string) => String(v).trim().toLowerCase()).filter(Boolean))]
+    if (!sourceAvailableForModules(report.data_source, enabledModules)) {
+      const missing = sourceRequiredModules(report.data_source).filter((module) => !enabledModules.has(module)).map(moduleLabel).join(', ')
+      const message = `Scheduled report skipped because these modules are disabled: ${missing || 'required module'}.`
+      await db.from('report_schedule_runs').insert({ saved_report_id:report.id, run_key:key, scheduled_local_date:now.date, status:'skipped', recipients, recipient_count:recipients.length, row_count:0, error_message:message })
+      await db.from('saved_reports').update({ last_run_at:new Date().toISOString(), last_run_status:'skipped', last_run_message:message }).eq('id',report.id)
+      continue
+    }
     const scope = await ownerScope(db,report.owner_user_id)
     if (!scope) {
       const message = 'Report owner no longer has an active System Administrator or Agency Administrator role.'

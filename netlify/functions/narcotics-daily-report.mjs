@@ -20,6 +20,10 @@ export default async () => {
   const from = process.env.NARCOTICS_REPORT_FROM || 'GEAEMS Portal <no-reply@auth.geaemss.org>'
   if (!supabaseUrl || !secret || !resendKey) throw new Error('Narcotics report function is missing required environment variables.')
   const db = createClient(supabaseUrl, secret, { auth: { persistSession: false, autoRefreshToken: false } })
+  const { data: moduleSetting, error: moduleError } = await db.from('system_module_settings').select('enabled').eq('module_key', 'narcotics').maybeSingle()
+  // Narcotics is intentionally OFF by default during the initial staged rollout.
+  // If migration 019 is not present yet, do not send controlled-substance reminders.
+  if (moduleError || moduleSetting?.enabled !== true) return new Response('narcotics module disabled')
   const { data: settings, error: settingsError } = await db.from('narcotics_agency_settings').select('*, agencies(name, short_name)').eq('enabled', true).eq('send_incomplete_report', true)
   if (settingsError) throw settingsError
 

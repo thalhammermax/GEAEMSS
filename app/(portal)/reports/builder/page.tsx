@@ -3,8 +3,9 @@ import Link from 'next/link'
 import { PageHeader } from '@/components/page-header'
 import { ReportBuilder } from '@/components/report-builder'
 import { requireReportAdmin } from '@/lib/report-auth'
-import { BUILTIN_REPORTS, REPORT_SOURCES, builtInFor, type ReportDefinition } from '@/lib/report-catalog'
+import { REPORT_SOURCES, builtInFor, sourceAvailableForModules, type ReportDefinition } from '@/lib/report-catalog'
 import { reportFieldsForSource } from '@/lib/report-data'
+import { enabledModuleKeys, getModuleStates } from '@/lib/modules'
 
 export const metadata: Metadata = { title: 'Report Builder' }
 type Props = { searchParams: Promise<{ id?: string; preset?: string }> }
@@ -21,21 +22,57 @@ function fromSaved(row:any): ReportDefinition {
 export default async function ReportBuilderPage({ searchParams }: Props) {
   const qs = await searchParams
   const { supabase } = await requireReportAdmin()
-  const fieldsEntries = await Promise.all(REPORT_SOURCES.map(async (source) => [source.key, await reportFieldsForSource(supabase, source.key)] as const))
-  const fieldsBySource = Object.fromEntries(fieldsEntries)
-  let initial: ReportDefinition = { dataSource:'personnel', columns:fieldsBySource.personnel.filter((f:any) => f.default).map((f:any) => f.key), filters:[], sortDirection:'asc', schedule:{ enabled:false, frequency:'daily', timezone:'America/Chicago', hour:8, weekday:1, dayOfMonth:1, recipients:[], deliveryMode:'inline_csv' } }
-  let presetName: string | undefined
+  const moduleStates = await getModuleStates(supabase)
+  const enabledModules = new Set(enabledModuleKeys(moduleStates))
 
+  let savedRow: any = null
   if (qs.id) {
     const { data } = await supabase.from('saved_reports').select('*').eq('id', qs.id).maybeSingle()
-    if (data) initial = fromSaved(data)
+    savedRow = data
+  }
+
+  const sources = REPORT_SOURCES.filter((source) =>
+    sourceAvailableForModules(source.key, enabledModules) || source.key === savedRow?.data_source
+  )
+  const fieldsEntries = await Promise.all(sources.map(async (source) => [
+    source.key,
+    await reportFieldsForSource(supabase, source.key, enabledModules),
+  ] as const))
+  const fieldsBySource = Object.fromEntries(fieldsEntries)
+
+  const defaultSource = sources.find((source) => source.key === 'vehicle_operations')
+    || sources.find((source) => source.key === 'fleet')
+    || sources[0]
+
+  if (!defaultSource) throw new Error('No report datasets are currently available.')
+
+  let initial: ReportDefinition = {
+    dataSource: defaultSource.key,
+    columns: (fieldsBySource[defaultSource.key] || []).filter((field:any) => field.default).map((field:any) => field.key),
+    filters: [],
+    sortDirection: 'asc',
+    schedule: { enabled:false, frequency:'daily', timezone:'America/Chicago', hour:8, weekday:1, dayOfMonth:1, recipients:[], deliveryMode:'inline_csv' },
+  }
+  let presetName: string | undefined
+
+  if (savedRow) {
+    initial = fromSaved(savedRow)
   } else if (qs.preset) {
     const preset = builtInFor(qs.preset)
-    if (preset) { initial = { ...preset.definition, columns:[...preset.definition.columns], filters:preset.definition.filters.map((f) => ({ ...f })), schedule:{ enabled:false, frequency:'daily', timezone:'America/Chicago', hour:8, weekday:1, dayOfMonth:1, recipients:[], deliveryMode:'inline_csv' } }; presetName = preset.name }
+    if (preset && sourceAvailableForModules(preset.definition.dataSource, enabledModules)) {
+      const availableKeys = new Set((fieldsBySource[preset.definition.dataSource] || []).map((field:any) => field.key))
+      initial = {
+        ...preset.definition,
+        columns: preset.definition.columns.filter((column) => availableKeys.has(column)),
+        filters: preset.definition.filters.filter((filter) => availableKeys.has(filter.field)).map((filter) => ({ ...filter })),
+        schedule: { enabled:false, frequency:'daily', timezone:'America/Chicago', hour:8, weekday:1, dayOfMonth:1, recipients:[], deliveryMode:'inline_csv' },
+      }
+      presetName = preset.name
+    }
   }
 
   return <>
-    <PageHeader eyebrow="Reports" title={initial.id ? `Edit ${initial.name}` : 'Custom Report Builder'} description="Choose a data source, fields, filters, grouping, and optional scheduled email delivery." action={<Link className="secondary-button button-link" href="/reports">Back to Reports</Link>} />
-    <ReportBuilder sources={REPORT_SOURCES} fieldsBySource={fieldsBySource} initial={initial} presetName={presetName} />
+    <PageHeader eyebrow="Reports" title={initial.id ? `Edit ${initial.name}` : 'Custom Report Builder'} description="Build reports from a single module or a combined dataset such as Fleet + Inspections, then filter, group, export, save, or schedule the result." action={<Link className="secondary-button button-link" href="/reports">Back to Reports</Link>} />
+    <ReportBuilder sources={sources} fieldsBySource={fieldsBySource} initial={initial} presetName={presetName} />
   </>
 }

@@ -1,3 +1,5 @@
+import type { ModuleKey } from './modules'
+
 export type ReportFieldType = 'text' | 'number' | 'date' | 'boolean'
 
 export type ReportField = {
@@ -5,6 +7,7 @@ export type ReportField = {
   label: string
   type: ReportFieldType
   default?: boolean
+  module?: ModuleKey
 }
 
 export type ReportSource = {
@@ -49,6 +52,36 @@ export type BuiltInReport = {
   name: string
   description: string
   definition: ReportDefinition
+}
+
+export const REPORT_SOURCE_MODULES: Record<string, ModuleKey[]> = {
+  personnel: ['personnel'],
+  agencies: [],
+  credential_compliance: ['personnel','credentials'],
+  credential_records: ['personnel','credentials'],
+  credential_history: ['personnel','credentials'],
+  credential_submissions: ['personnel','credentials'],
+  credential_type_census: ['credentials'],
+  fleet: ['fleet'],
+  vehicle_operations: ['fleet','inspections'],
+  provider_operations: ['personnel'],
+  vehicle_license_compliance: ['fleet'],
+  inspection_compliance: ['fleet','inspections'],
+  inspection_history: ['fleet','inspections'],
+  inspection_deficiencies: ['fleet','inspections'],
+  ce_completions: ['personnel','ce'],
+  ce_attendance_history: ['personnel','ce'],
+  narcotics_history: ['fleet','narcotics'],
+  agency_compliance_summary: ['personnel','credentials','fleet','inspections'],
+}
+
+export function sourceRequiredModules(key: string) {
+  return REPORT_SOURCE_MODULES[key] ?? []
+}
+
+export function sourceAvailableForModules(key: string, enabled: Set<ModuleKey> | ModuleKey[]) {
+  const set = enabled instanceof Set ? enabled : new Set(enabled)
+  return sourceRequiredModules(key).every((module) => set.has(module))
 }
 
 export const REPORT_SOURCES: ReportSource[] = [
@@ -140,6 +173,69 @@ export const REPORT_SOURCES: ReportSource[] = [
       { key: 'active_records', label: 'Current Verified Records', type: 'number', default: true },
       { key: 'expiring_90_days', label: 'Expiring Within 90 Days', type: 'number', default: true },
       { key: 'expired_records', label: 'Expired Records', type: 'number', default: true },
+    ]
+  },
+  {
+    key: 'vehicle_operations', label: 'Vehicle + Inspection Operations', description: 'One row per vehicle combining Fleet and Inspection data. Narcotics fields become available automatically when that module is enabled.', fields: [
+      { key: 'agency', label: 'Agency', type: 'text', default: true, module: 'fleet' },
+      { key: 'unit_number', label: 'Unit Number', type: 'text', default: true, module: 'fleet' },
+      { key: 'fleet_number', label: 'Fleet Number', type: 'text', module: 'fleet' },
+      { key: 'vehicle_type', label: 'Vehicle Type', type: 'text', default: true, module: 'fleet' },
+      { key: 'vehicle_status', label: 'Vehicle Status', type: 'text', default: true, module: 'fleet' },
+      { key: 'vin', label: 'VIN', type: 'text', module: 'fleet' },
+      { key: 'year', label: 'Year', type: 'number', module: 'fleet' },
+      { key: 'make', label: 'Make', type: 'text', module: 'fleet' },
+      { key: 'model', label: 'Model', type: 'text', module: 'fleet' },
+      { key: 'license_plate', label: 'License Plate', type: 'text', module: 'fleet' },
+      { key: 'license_plate_state', label: 'Plate State', type: 'text', module: 'fleet' },
+      { key: 'in_service_date', label: 'In Service Date', type: 'date', module: 'fleet' },
+
+      { key: 'inspection_requirement_count', label: 'Required Inspection Types', type: 'number', module: 'inspections' },
+      { key: 'inspection_issue_count', label: 'Inspection Compliance Issues', type: 'number', default: true, module: 'inspections' },
+      { key: 'inspection_compliance_status', label: 'Worst Inspection Status', type: 'text', default: true, module: 'inspections' },
+      { key: 'next_inspection_due', label: 'Next Inspection Due', type: 'date', default: true, module: 'inspections' },
+      { key: 'latest_inspection_date', label: 'Latest Completed Inspection', type: 'date', default: true, module: 'inspections' },
+      { key: 'latest_inspection_type', label: 'Latest Inspection Type', type: 'text', module: 'inspections' },
+      { key: 'latest_inspection_result', label: 'Latest Inspection Result', type: 'text', default: true, module: 'inspections' },
+      { key: 'latest_inspector', label: 'Latest Inspector', type: 'text', module: 'inspections' },
+      { key: 'overdue_inspection_count', label: 'Overdue Inspections', type: 'number', module: 'inspections' },
+      { key: 'failed_inspection_count', label: 'Failed / OOS Inspections', type: 'number', module: 'inspections' },
+      { key: 'missing_inspection_count', label: 'Missing / Unscheduled Inspections', type: 'number', module: 'inspections' },
+      { key: 'open_deficiency_count', label: 'Open Deficiencies', type: 'number', default: true, module: 'inspections' },
+      { key: 'critical_deficiency_count', label: 'Critical Open Deficiencies', type: 'number', default: true, module: 'inspections' },
+
+      { key: 'narcotics_count_required', label: 'Daily Narcotics Count Required', type: 'boolean', module: 'narcotics' },
+      { key: 'latest_narcotics_count_date', label: 'Latest Narcotics Count', type: 'date', module: 'narcotics' },
+      { key: 'latest_narcotics_seal', label: 'Latest Seal Number', type: 'text', module: 'narcotics' },
+      { key: 'latest_narcotics_signed_by', label: 'Latest Narcotics Signer', type: 'text', module: 'narcotics' },
+      { key: 'latest_narcotics_discrepancy', label: 'Latest Count Has Discrepancy', type: 'boolean', module: 'narcotics' },
+    ]
+  },
+  {
+    key: 'provider_operations', label: 'Provider + Credential + CE Overview', description: 'One row per provider. Personnel fields are always present; Credential and CE fields appear as those modules are enabled.', fields: [
+      { key: 'provider_name', label: 'Provider Name', type: 'text', default: true, module: 'personnel' },
+      { key: 'provider_number', label: 'System Provider ID', type: 'text', default: true, module: 'personnel' },
+      { key: 'provider_level', label: 'Provider Level', type: 'text', default: true, module: 'personnel' },
+      { key: 'provider_status', label: 'Provider Status', type: 'text', default: true, module: 'personnel' },
+      { key: 'agencies', label: 'Active Agencies', type: 'text', default: true, module: 'personnel' },
+      { key: 'primary_agency', label: 'Primary Agency', type: 'text', module: 'personnel' },
+      { key: 'email', label: 'Email', type: 'text', module: 'personnel' },
+      { key: 'phone', label: 'Phone', type: 'text', module: 'personnel' },
+      { key: 'system_entry_date', label: 'System Entry Date', type: 'date', module: 'personnel' },
+
+      { key: 'required_credential_count', label: 'Required Credential Count', type: 'number', module: 'credentials' },
+      { key: 'credential_issue_count', label: 'Credential Compliance Issues', type: 'number', module: 'credentials' },
+      { key: 'missing_credential_count', label: 'Missing Credentials', type: 'number', module: 'credentials' },
+      { key: 'expired_credential_count', label: 'Expired Credentials', type: 'number', module: 'credentials' },
+      { key: 'expiring_credential_count', label: 'Expiring Soon Credentials', type: 'number', module: 'credentials' },
+      { key: 'pending_credential_submissions', label: 'Pending Credential Submissions', type: 'number', module: 'credentials' },
+      { key: 'next_credential_expiration', label: 'Next Credential Expiration', type: 'date', module: 'credentials' },
+
+      { key: 'ce_total_hours', label: 'Total Approved CE Hours', type: 'number', module: 'ce' },
+      { key: 'ce_hours_12_months', label: 'CE Hours - Last 12 Months', type: 'number', module: 'ce' },
+      { key: 'ce_completion_count', label: 'CE Completion Count', type: 'number', module: 'ce' },
+      { key: 'latest_ce_date', label: 'Latest CE Completion', type: 'date', module: 'ce' },
+      { key: 'pending_external_ce', label: 'Pending External CE', type: 'number', module: 'ce' },
     ]
   },
   {
@@ -277,6 +373,8 @@ export const BUILTIN_REPORTS: BuiltInReport[] = [
   { key: 'pending-credential-verification', name: 'Pending Credential Verification', description: 'Credential renewal submissions awaiting administrative review.', definition: { dataSource: 'credential_submissions', columns: ['provider_name','agencies','credential_name','status','expiration_date','submitted_at'], filters: [{ field:'status', operator:'equals', value:'pending' }], sortField: 'submitted_at', sortDirection: 'asc' } },
   { key: 'provider-credential-history', name: 'Provider Credential History', description: 'Historical credential records, including superseded credentials.', definition: { dataSource: 'credential_history', columns: ['provider_name','agencies','credential_name','credential_number','issue_date','expiration_date','verification_status','is_current'], filters: [], sortField: 'provider_name', sortDirection: 'asc' } },
   { key: 'credential-type-census', name: 'Credential Type Census', description: 'Counts of current, expiring and expired records by credential type.', definition: { dataSource: 'credential_type_census', columns: ['credential_name','category','scope','active_records','expiring_90_days','expired_records'], filters: [], sortField: 'credential_name', sortDirection: 'asc' } },
+  { key: 'vehicle-operations-overview', name: 'Vehicle & Inspection Operations', description: 'One row per vehicle combining fleet details, inspection compliance, latest inspection, and deficiency counts.', definition: { dataSource: 'vehicle_operations', columns: ['agency','unit_number','vehicle_type','vehicle_status','inspection_compliance_status','next_inspection_due','latest_inspection_date','latest_inspection_result','open_deficiency_count','critical_deficiency_count'], filters: [], sortField: 'agency', sortDirection: 'asc', groupField: 'agency' } },
+  { key: 'provider-operations-overview', name: 'Provider Compliance & CE Overview', description: 'One row per provider with Personnel plus Credential and CE summaries as those modules are enabled.', definition: { dataSource: 'provider_operations', columns: ['provider_name','provider_number','provider_level','agencies','credential_issue_count','pending_credential_submissions','ce_hours_12_months','latest_ce_date'], filters: [], sortField: 'provider_name', sortDirection: 'asc' } },
   { key: 'fleet-roster', name: 'Fleet Roster', description: 'Active system and agency vehicle roster.', definition: { dataSource: 'fleet', columns: ['agency','unit_number','fleet_number','vehicle_type','vehicle_status','year','make','model','license_plate'], filters: [], sortField: 'agency', sortDirection: 'asc', groupField: 'agency' } },
   { key: 'vehicle-license-expiration', name: 'Vehicle License Expiration', description: 'Required vehicle licensing and expiration status.', definition: { dataSource: 'vehicle_license_compliance', columns: ['agency','unit_number','license_name','expiration_date','compliance_status','days_remaining'], filters: [], sortField: 'expiration_date', sortDirection: 'asc' } },
   { key: 'upcoming-inspections', name: 'Upcoming / Overdue Inspections', description: 'Inspection due dates and current inspection compliance.', definition: { dataSource: 'inspection_compliance', columns: ['agency','unit_number','inspection_name','latest_inspection_date','latest_result','next_due_date','compliance_status','days_until_due'], filters: [{ field:'compliance_status', operator:'not_equals', value:'CURRENT' }], sortField: 'next_due_date', sortDirection: 'asc' } },

@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ReportDefinition, ReportField, ReportFilter, ReportSource } from '@/lib/report-catalog'
+import { moduleLabel } from '@/lib/modules'
 import { previewReportAction, saveReportAction } from '@/app/(portal)/reports/actions'
 
 type Props = {
@@ -122,15 +123,15 @@ export function ReportBuilder({ sources, fieldsBySource, initial, presetName }: 
         <div className="form-card-heading"><div><span>Report</span><h2>Definition</h2></div></div>
         <div className="form-grid two">
           <label className="field"><span>Name *</span><input value={definition.name || ''} onChange={(e) => setDefinition((d) => ({ ...d, name:e.target.value }))} placeholder="My custom report" /></label>
-          <label className="field"><span>Data source *</span><select value={definition.dataSource} onChange={(e) => changeSource(e.target.value)}>{sources.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></label>
+          <label className="field"><span>Report dataset *</span><select value={definition.dataSource} onChange={(e) => changeSource(e.target.value)}>{sources.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></label>
           <label className="field span-full"><span>Description</span><textarea rows={2} value={definition.description || ''} onChange={(e) => setDefinition((d) => ({ ...d, description:e.target.value }))} placeholder="Optional description for other administrators." /></label>
         </div>
-        <p className="helper-copy">{sources.find((s) => s.key === definition.dataSource)?.description}</p>
+        <p className="helper-copy">{sources.find((s) => s.key === definition.dataSource)?.description} Combined datasets join related modules at a safe record grain so one-to-many relationships do not create accidental duplicate rows.</p>
       </section>
 
       <section className="form-card report-builder-card">
         <div className="form-card-heading"><div><span>Columns</span><h2>Choose report fields</h2></div><div className="compact-actions"><button type="button" className="text-button" onClick={() => setDefinition((d) => ({ ...d, columns:fields.map((f) => f.key) }))}>Select all</button><button type="button" className="text-button" onClick={() => setDefinition((d) => ({ ...d, columns:[] }))}>Clear</button></div></div>
-        <div className="report-field-grid">{fields.map((field) => <label className="report-field-option" key={field.key}><input type="checkbox" checked={definition.columns.includes(field.key)} onChange={() => toggleColumn(field.key)} /><span>{field.label}</span></label>)}</div>
+        <div className="report-field-grid">{fields.map((field) => <label className="report-field-option" key={field.key}><input type="checkbox" checked={definition.columns.includes(field.key)} onChange={() => toggleColumn(field.key)} /><span>{field.label}{field.module && <small>{moduleLabel(field.module)}</small>}</span></label>)}</div>
       </section>
 
       <section className="form-card report-builder-card">
