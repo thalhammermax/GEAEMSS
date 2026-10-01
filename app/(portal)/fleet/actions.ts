@@ -10,7 +10,7 @@ function textValue(formData: FormData, key: string) {
   return typeof value === 'string' ? value.trim() : ''
 }
 function nullable(value: string) { return value || null }
-function fail(path: string, message: string): never { redirect(`${path}?error=${encodeURIComponent(message)}`) }
+function fail(path: string, message: string): never { redirect(`${path}${path.includes('?') ? '&' : '?'}error=${encodeURIComponent(message)}`) }
 
 async function vehiclePayload(supabase: any, formData: FormData, path: string) {
   const { fields, error } = await fetchFieldDefinitions(supabase, 'vehicle')
@@ -87,6 +87,38 @@ export async function setVehicleActive(formData: FormData) {
   if (error) fail(`/fleet/${id}`, error.message)
   revalidatePath('/fleet')
   revalidatePath(`/fleet/${id}`)
+  revalidatePath('/inspections')
   revalidatePath('/dashboard')
-  redirect(`/fleet/${id}?saved=1`)
+  revalidatePath('/reports')
+  redirect(`/fleet/${id}?saved=${active ? 'restored' : 'archived'}`)
+}
+
+export async function bulkSetVehicleActive(formData: FormData) {
+  const ids = formData.getAll('vehicle_ids')
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    .slice(0, 500)
+  const active = textValue(formData, 'active') === 'true'
+  const returnView = textValue(formData, 'return_view') === 'archived' ? 'archived' : 'active'
+
+  if (!ids.length) fail(`/fleet?view=${returnView}`, 'Select at least one vehicle first.')
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('vehicles')
+    .update({ active })
+    .in('id', ids)
+    .select('id')
+
+  if (error) fail(`/fleet?view=${returnView}`, error.message)
+  const changed = data?.length ?? 0
+  if (!changed) fail(`/fleet?view=${returnView}`, 'No vehicle records were changed. Check your Fleet management permissions.')
+
+  revalidatePath('/fleet')
+  revalidatePath('/inspections')
+  revalidatePath('/dashboard')
+  revalidatePath('/reports')
+
+  const destination = active ? 'active' : 'archived'
+  const label = active ? 'restored to the current fleet' : 'archived'
+  redirect(`/fleet?view=${destination}&notice=${encodeURIComponent(`${changed} vehicle${changed === 1 ? '' : 's'} ${label}.`)}`)
 }

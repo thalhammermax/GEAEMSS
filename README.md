@@ -1,9 +1,43 @@
-# GEAEMS Portal v0.10.0
+# GEAEMS Portal v0.10.1
 
 v0.10 adds staged **module rollout controls** and **multi-module reporting**. The initial production configuration enables Fleet, Inspections, and Reports while Personnel, Credentials, CE Tracking, and Narcotics remain disabled until GEAEMS is ready to roll them out.
 
 Production portal: `https://portal.geaemss.org`
 
+
+## New in v0.10.1 — Vehicle archiving for production rollout
+
+Fleet records now use the existing vehicle `active` flag as a true archive workflow.
+
+### Current fleet vs archived vehicles
+
+**Fleet** now opens to the **Current fleet** by default. Archived vehicles are hidden from normal production use and can be reviewed separately with **Archived vehicles** or the Fleet view filter.
+
+Fleet administrators can:
+
+- archive one vehicle from its Vehicle record
+- select multiple current vehicles and choose **Archive selected**
+- review archived vehicles separately
+- select multiple archived vehicles and choose **Restore selected**
+- open an archived vehicle and retain its complete inspection history
+
+Archiving does not delete the vehicle, inspections, licenses, deficiencies, custom fields, or audit history.
+
+### Production isolation
+
+Archived vehicles are excluded from:
+
+- the normal Current Fleet list
+- the Start Inspection vehicle picker
+- the active Inspections list and open-deficiency summary
+- Fleet and Vehicle + Inspection operational reports
+- Inspection History and Inspection Deficiency standard reports
+- vehicle compliance dashboards and compliance views
+- Narcotics operational reporting for active apparatus
+
+Completed inspection records remain available from the archived Vehicle record and can still be opened or exported as PDF.
+
+This release uses the existing `vehicles.active` database field, so **no new Supabase migration is required**.
 
 ## New in v0.10 — Staged module rollout & multi-module reports
 

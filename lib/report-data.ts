@@ -263,7 +263,7 @@ async function credentialTypeCensusRows(supabase: SupabaseClient, scope?: Report
 }
 
 async function fleetRows(supabase: SupabaseClient, fields: CustomReportField[], scope?: ReportScope): Promise<ReportRow[]> {
-  let query = supabase.from('vehicles').select('id, agency_id, unit_number, fleet_number, vin, year, make, model, license_plate, license_plate_state, in_service_date, narcotics_count_required, agencies(name, short_name), vehicle_types(name, code), vehicle_statuses(name, code)').order('unit_number').limit(5000)
+  let query = supabase.from('vehicles').select('id, agency_id, unit_number, fleet_number, vin, year, make, model, license_plate, license_plate_state, in_service_date, narcotics_count_required, agencies(name, short_name), vehicle_types(name, code), vehicle_statuses(name, code)').eq('active', true).order('unit_number').limit(5000)
   const allowed = agencyScope(scope)
   if (allowed !== null) { if (!allowed.length) return []; query = query.in('agency_id', allowed) }
   const { data, error } = await query
@@ -525,17 +525,17 @@ async function inspectionComplianceRows(supabase: SupabaseClient, scope?: Report
 }
 
 async function inspectionHistoryRows(supabase: SupabaseClient, scope?: ReportScope): Promise<ReportRow[]> {
-  const { data, error } = await supabase.from('vehicle_inspections').select('id, inspection_date, result, workflow_status, inspector_name, inspection_location, odometer, submitted_at, vehicles(agency_id, unit_number, fleet_number, agencies(name, short_name)), inspection_types(name)').order('inspection_date', { ascending: false }).limit(10000)
+  const { data, error } = await supabase.from('vehicle_inspections').select('id, inspection_date, result, workflow_status, inspector_name, inspection_location, odometer, submitted_at, vehicles(active, agency_id, unit_number, fleet_number, agencies(name, short_name)), inspection_types(name)').order('inspection_date', { ascending: false }).limit(10000)
   if (error) throw error
   const allowed = agencyScope(scope)
-  return (data ?? []).filter((row: any) => { const vehicle = one<any>(row.vehicles); return allowed === null || (allowed.includes(vehicle?.agency_id) && row.workflow_status === 'submitted') }).map((row: any) => { const vehicle = one<any>(row.vehicles); return { inspection_date: row.inspection_date, agency: displayAgency(one(vehicle?.agencies)), unit_number: vehicle?.unit_number || vehicle?.fleet_number || '', inspection_type: one<any>(row.inspection_types)?.name || '', workflow_status: row.workflow_status, result: row.result, inspector_name: row.inspector_name, inspection_location: row.inspection_location, odometer: row.odometer, submitted_at: row.submitted_at } })
+  return (data ?? []).filter((row: any) => { const vehicle = one<any>(row.vehicles); return vehicle?.active === true && (allowed === null || (allowed.includes(vehicle?.agency_id) && row.workflow_status === 'submitted')) }).map((row: any) => { const vehicle = one<any>(row.vehicles); return { inspection_date: row.inspection_date, agency: displayAgency(one(vehicle?.agencies)), unit_number: vehicle?.unit_number || vehicle?.fleet_number || '', inspection_type: one<any>(row.inspection_types)?.name || '', workflow_status: row.workflow_status, result: row.result, inspector_name: row.inspector_name, inspection_location: row.inspection_location, odometer: row.odometer, submitted_at: row.submitted_at } })
 }
 
 async function inspectionDeficiencyRows(supabase: SupabaseClient, scope?: ReportScope): Promise<ReportRow[]> {
-  const { data, error } = await supabase.from('vehicle_inspection_deficiencies').select('description, severity, status, correction_due_date, corrected_at, correction_notes, vehicle_inspections(inspection_date, workflow_status, vehicles(agency_id, unit_number, fleet_number, agencies(name, short_name)))').order('created_at', { ascending: false }).limit(10000)
+  const { data, error } = await supabase.from('vehicle_inspection_deficiencies').select('description, severity, status, correction_due_date, corrected_at, correction_notes, vehicle_inspections(inspection_date, workflow_status, vehicles(active, agency_id, unit_number, fleet_number, agencies(name, short_name)))').order('created_at', { ascending: false }).limit(10000)
   if (error) throw error
   const allowed = agencyScope(scope)
-  return (data ?? []).filter((row: any) => { const inspection = one<any>(row.vehicle_inspections); const vehicle = one<any>(inspection?.vehicles); return allowed === null || (allowed.includes(vehicle?.agency_id) && inspection?.workflow_status === 'submitted') }).map((row: any) => { const inspection = one<any>(row.vehicle_inspections); const vehicle = one<any>(inspection?.vehicles); return { inspection_date: inspection?.inspection_date || null, agency: displayAgency(one(vehicle?.agencies)), unit_number: vehicle?.unit_number || vehicle?.fleet_number || '', description: row.description, severity: row.severity, status: row.status, correction_due_date: row.correction_due_date, corrected_at: row.corrected_at, correction_notes: row.correction_notes } })
+  return (data ?? []).filter((row: any) => { const inspection = one<any>(row.vehicle_inspections); const vehicle = one<any>(inspection?.vehicles); return vehicle?.active === true && (allowed === null || (allowed.includes(vehicle?.agency_id) && inspection?.workflow_status === 'submitted')) }).map((row: any) => { const inspection = one<any>(row.vehicle_inspections); const vehicle = one<any>(inspection?.vehicles); return { inspection_date: inspection?.inspection_date || null, agency: displayAgency(one(vehicle?.agencies)), unit_number: vehicle?.unit_number || vehicle?.fleet_number || '', description: row.description, severity: row.severity, status: row.status, correction_due_date: row.correction_due_date, corrected_at: row.corrected_at, correction_notes: row.correction_notes } })
 }
 
 async function ceCompletionRows(supabase: SupabaseClient, scope?: ReportScope): Promise<ReportRow[]> {
@@ -595,11 +595,11 @@ async function ceAttendanceRows(supabase: SupabaseClient, scope?: ReportScope): 
 }
 
 async function narcoticsRows(supabase: SupabaseClient, scope?: ReportScope): Promise<ReportRow[]> {
-  let query = supabase.from('narcotics_counts').select('agency_id, count_date, has_discrepancy, seal_number, prior_seal_number, seal_change_reason, signed_name, signed_at, vehicles(unit_number, fleet_number, agencies(name, short_name)), narcotics_count_templates(name)').eq('status', 'submitted').order('count_date', { ascending: false }).limit(10000)
+  let query = supabase.from('narcotics_counts').select('agency_id, count_date, has_discrepancy, seal_number, prior_seal_number, seal_change_reason, signed_name, signed_at, vehicles(active, unit_number, fleet_number, agencies(name, short_name)), narcotics_count_templates(name)').eq('status', 'submitted').order('count_date', { ascending: false }).limit(10000)
   const allowed = agencyScope(scope); if (allowed !== null) { if (!allowed.length) return []; query = query.in('agency_id', allowed) }
   const { data, error } = await query
   if (error) throw error
-  return (data ?? []).map((row: any) => { const vehicle = one<any>(row.vehicles); return { count_date: row.count_date, agency: displayAgency(one(vehicle?.agencies)), unit_number: vehicle?.unit_number || vehicle?.fleet_number || '', form_name: one<any>(row.narcotics_count_templates)?.name || '', seal_number: row.seal_number, prior_seal_number: row.prior_seal_number, seal_change_reason: row.seal_change_reason, signed_name: row.signed_name, signed_at: row.signed_at, has_discrepancy: row.has_discrepancy } })
+  return (data ?? []).filter((row: any) => one<any>(row.vehicles)?.active === true).map((row: any) => { const vehicle = one<any>(row.vehicles); return { count_date: row.count_date, agency: displayAgency(one(vehicle?.agencies)), unit_number: vehicle?.unit_number || vehicle?.fleet_number || '', form_name: one<any>(row.narcotics_count_templates)?.name || '', seal_number: row.seal_number, prior_seal_number: row.prior_seal_number, seal_change_reason: row.seal_change_reason, signed_name: row.signed_name, signed_at: row.signed_at, has_discrepancy: row.has_discrepancy } })
 }
 
 async function agencyComplianceRows(supabase: SupabaseClient, scope?: ReportScope): Promise<ReportRow[]> {
@@ -615,7 +615,7 @@ async function agencyComplianceRows(supabase: SupabaseClient, scope?: ReportScop
     supabase.from('provider_compliance').select('provider_id, compliance_status, credential_scope_type, credential_agency_id').neq('compliance_status', 'CURRENT').limit(10000),
     supabase.from('vehicle_license_compliance').select('agency_id, compliance_status').in('agency_id', ids).neq('compliance_status', 'CURRENT').limit(10000),
     supabase.from('vehicle_inspection_compliance').select('agency_id, compliance_status').in('agency_id', ids).neq('compliance_status', 'CURRENT').limit(10000),
-    supabase.from('vehicle_inspection_deficiencies').select('status, vehicle_inspections(workflow_status, vehicles(agency_id))').eq('status', 'open').limit(10000),
+    supabase.from('vehicle_inspection_deficiencies').select('status, vehicle_inspections(workflow_status, vehicles(active, agency_id))').eq('status', 'open').limit(10000),
   ])
   const providerAgencies = new Map<string, Set<string>>(); const providerCounts = new Map<string, number>()
   for (const row of memberships.data ?? []) { if (!providerAgencies.has(row.provider_id)) providerAgencies.set(row.provider_id, new Set()); providerAgencies.get(row.provider_id)!.add(row.agency_id); providerCounts.set(row.agency_id, (providerCounts.get(row.agency_id) ?? 0) + 1) }
@@ -623,7 +623,7 @@ async function agencyComplianceRows(supabase: SupabaseClient, scope?: ReportScop
   const credIssues = new Map<string, number>(); for (const row of cred.data ?? []) for (const agencyId of providerAgencies.get(row.provider_id) ?? []) if (row.credential_scope_type === 'system' || row.credential_agency_id === agencyId) credIssues.set(agencyId, (credIssues.get(agencyId) ?? 0) + 1)
   const licenseIssues = new Map<string, number>(); for (const row of licenses.data ?? []) licenseIssues.set(row.agency_id, (licenseIssues.get(row.agency_id) ?? 0) + 1)
   const inspectionIssues = new Map<string, number>(); for (const row of inspections.data ?? []) inspectionIssues.set(row.agency_id, (inspectionIssues.get(row.agency_id) ?? 0) + 1)
-  const deficiencyCounts = new Map<string, number>(); for (const row of deficiencies.data ?? []) { const vi = one<any>(row.vehicle_inspections); const v = one<any>(vi?.vehicles); if (v?.agency_id && (scope?.isSystemAdmin || vi?.workflow_status === 'submitted')) deficiencyCounts.set(v.agency_id, (deficiencyCounts.get(v.agency_id) ?? 0) + 1) }
+  const deficiencyCounts = new Map<string, number>(); for (const row of deficiencies.data ?? []) { const vi = one<any>(row.vehicle_inspections); const v = one<any>(vi?.vehicles); if (v?.active === true && v?.agency_id && (scope?.isSystemAdmin || vi?.workflow_status === 'submitted')) deficiencyCounts.set(v.agency_id, (deficiencyCounts.get(v.agency_id) ?? 0) + 1) }
   return (agencies ?? []).map((agency: any) => ({ agency: displayAgency(agency), active_providers: providerCounts.get(agency.id) ?? 0, credential_issues: credIssues.get(agency.id) ?? 0, active_vehicles: fleetCounts.get(agency.id) ?? 0, vehicle_license_issues: licenseIssues.get(agency.id) ?? 0, inspection_issues: inspectionIssues.get(agency.id) ?? 0, open_deficiencies: deficiencyCounts.get(agency.id) ?? 0 }))
 }
 
