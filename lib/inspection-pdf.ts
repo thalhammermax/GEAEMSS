@@ -106,7 +106,7 @@ export async function buildInspectionPdf(data: InspectionPdfData) {
     ? 'DRAFT'
     : titleCase(data.inspection?.result || data.inspection?.workflow_status || 'Submitted')
 
-  let page: PDFPage
+  let page!: PDFPage
   let y = 0
 
   const addPage = () => {
