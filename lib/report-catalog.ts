@@ -108,8 +108,8 @@ export const REPORT_SOURCES: ReportSource[] = [
       { key: 'agency_name', label: 'Agency Name', type: 'text', default: true },
       { key: 'short_name', label: 'Short Name', type: 'text', default: true },
       { key: 'active', label: 'Active', type: 'boolean', default: true },
-      { key: 'provider_count', label: 'Active Provider Count', type: 'number', default: true },
-      { key: 'vehicle_count', label: 'Active Vehicle Count', type: 'number', default: true },
+      { key: 'provider_count', label: 'Active Provider Count', type: 'number', default: true, module: 'personnel' },
+      { key: 'vehicle_count', label: 'Active Vehicle Count', type: 'number', default: true, module: 'fleet' },
     ]
   },
   {
@@ -252,7 +252,7 @@ export const REPORT_SOURCES: ReportSource[] = [
       { key: 'license_plate', label: 'License Plate', type: 'text' },
       { key: 'license_plate_state', label: 'Plate State', type: 'text' },
       { key: 'in_service_date', label: 'In Service Date', type: 'date' },
-      { key: 'narcotics_count_required', label: 'Daily Narcotics Count Required', type: 'boolean' },
+      { key: 'narcotics_count_required', label: 'Daily Narcotics Count Required', type: 'boolean', module: 'narcotics' },
     ]
   },
   {

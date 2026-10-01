@@ -2,6 +2,8 @@
 
 v0.10 adds staged **module rollout controls** and **multi-module reporting**. The initial production configuration enables Fleet, Inspections, and Reports while Personnel, Credentials, CE Tracking, and Narcotics remain disabled until GEAEMS is ready to roll them out.
 
+Production portal: `https://portal.geaemss.org`
+
 
 ## New in v0.10 — Staged module rollout & multi-module reports
 

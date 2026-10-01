@@ -158,9 +158,11 @@ async function agencyRows(supabase: SupabaseClient, fields: CustomReportField[],
   const { data, error } = await query
   if (error) throw error
   const ids = (data ?? []).map((agency: any) => agency.id)
+  const needsProviderCount = fields.some((field) => field.key === 'provider_count')
+  const needsVehicleCount = fields.some((field) => field.key === 'vehicle_count')
   const [{ data: memberships }, { data: vehicles }] = await Promise.all([
-    ids.length ? supabase.from('provider_agencies').select('agency_id').in('agency_id', ids).eq('active', true) : Promise.resolve({ data: [] } as any),
-    ids.length ? supabase.from('vehicles').select('agency_id').in('agency_id', ids).eq('active', true) : Promise.resolve({ data: [] } as any),
+    needsProviderCount && ids.length ? supabase.from('provider_agencies').select('agency_id').in('agency_id', ids).eq('active', true) : Promise.resolve({ data: [] } as any),
+    needsVehicleCount && ids.length ? supabase.from('vehicles').select('agency_id').in('agency_id', ids).eq('active', true) : Promise.resolve({ data: [] } as any),
   ])
   const providers = new Map<string, number>(); const fleet = new Map<string, number>()
   for (const row of memberships ?? []) providers.set(row.agency_id, (providers.get(row.agency_id) ?? 0) + 1)
