@@ -45,6 +45,12 @@ export async function GET(_request: Request, { params }: Context) {
     .eq('vehicle_inspection_id', id)
     .order('created_at')
 
+  const { data: pdfSettings } = await supabase
+    .from('inspection_pdf_template_settings')
+    .select('*')
+    .eq('id', 'system')
+    .maybeSingle()
+
   let formVersion: any = null
   let template: any = null
   let sections: any[] = []
@@ -94,6 +100,7 @@ export async function GET(_request: Request, { params }: Context) {
     sections,
     responses,
     deficiencies: deficiencies ?? [],
+    settings: pdfSettings,
   })
 
   const unit = filenamePart(vehicle?.unit_number || vehicle?.fleet_number || 'Vehicle')

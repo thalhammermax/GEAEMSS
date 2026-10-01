@@ -1,8 +1,38 @@
-# GEAEMS Portal v0.9.1
+# GEAEMS Portal v0.9.2
 
 Production portal: `https://portal.geaemss.org`
 
-v0.9.1 adds downloadable PDF exports for vehicle inspections and surfaces completed inspection forms directly on each Vehicle record. It retains the v0.9 **Continuing Education (CE) Tracking** module plus Personnel, Credentials, Fleet, Inspections, Narcotics, Reports, Administration, and provider credential self-service.
+v0.9.2 adds a System Administrator editor for the inspection PDF presentation template. It retains downloadable inspection PDFs, completed inspection history on Vehicle records, the v0.9 **Continuing Education (CE) Tracking** module, and the existing Personnel, Credentials, Fleet, Narcotics, Reports, and Administration functionality.
+
+## New in v0.9.2 — Editable inspection PDF template
+
+System Administrators now have **Inspections → PDF template**.
+
+The editor controls the system-wide presentation used whenever an inspection is exported to PDF, including:
+
+- organization name and report title
+- accent color and section-heading background color
+- customizable Summary, Notes, Checklist, and Deficiencies headings
+- custom footer text
+- toggles for the vehicle detail line and result badge
+- form version, submission timestamp, next-due date, and inspection ID visibility
+- overall notes, full checklist, requirement text, observed values, and checklist notes
+- deficiencies and corrective-action notes
+- PDF generation timestamp, page numbers, and draft watermark
+
+The editor includes both an on-screen approximation and a **Preview sample PDF** action that generates the real PDF renderer with sample inspection data.
+
+Template changes affect future exports immediately. They do not modify the inspection record or the historical checklist version attached to a completed inspection.
+
+### Database migration
+
+If migrations `001` through `017` are already installed, run only:
+
+```text
+supabase/migrations/018_inspection_pdf_template.sql
+```
+
+Do not rerun prior migrations.
 
 ## New in v0.9.1 — Inspection records & PDF export
 
