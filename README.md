@@ -1,8 +1,29 @@
-# GEAEMS Portal v0.9.0
+# GEAEMS Portal v0.9.1
 
 Production portal: `https://portal.geaemss.org`
 
-v0.9 adds the **Continuing Education (CE) Tracking** module while retaining Personnel, Credentials, Fleet, Inspections, Narcotics, Reports, Administration, and the v0.8 credential self-service workflow.
+v0.9.1 adds downloadable PDF exports for vehicle inspections and surfaces completed inspection forms directly on each Vehicle record. It retains the v0.9 **Continuing Education (CE) Tracking** module plus Personnel, Credentials, Fleet, Inspections, Narcotics, Reports, Administration, and provider credential self-service.
+
+## New in v0.9.1 — Inspection records & PDF export
+
+### Completed inspections on the Vehicle record
+Each Fleet → Vehicle record now includes a **Completed inspection forms** section. Submitted inspections stay attached to the apparatus and display:
+
+- inspection date
+- inspection/form name and historical form version
+- final result
+- inspector
+- next-due date
+- links to open the inspection or download its PDF
+
+This is intentionally historical: if an inspection form is later edited and republished, the Vehicle record still points to the exact form version that was used for the completed inspection.
+
+### Inspection PDF export
+Every inspection that the signed-in user is authorized to view can be downloaded as a PDF from either the inspection detail screen, the inspection history list, or the Vehicle record.
+
+The PDF includes the GEAEMS report header, vehicle and agency details, inspection metadata, the complete digital checklist and responses, notes, deficiencies/corrective actions, pagination, and a generation timestamp. Draft inspection PDFs are visibly watermarked **DRAFT**. Legacy inspection records export the information that exists on the legacy record.
+
+This release adds the `pdf-lib` runtime dependency and requires **no new Supabase migration**.
 
 ## New in v0.9 — CE Tracking
 

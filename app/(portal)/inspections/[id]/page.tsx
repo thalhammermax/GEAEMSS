@@ -31,7 +31,7 @@ export default async function InspectionPage({ params, searchParams }: Props) {
 
   if (!inspection.form_version_id) {
     return <>
-      <PageHeader eyebrow="Inspections" title={`${inspection.vehicles?.unit_number || 'Vehicle'} inspection`} description={`${formatDate(inspection.inspection_date)} · ${inspection.inspection_types?.name || 'Legacy inspection'}`} action={<Link className="secondary-button button-link small" href="/inspections">Back to inspections</Link>} />
+      <PageHeader eyebrow="Inspections" title={`${inspection.vehicles?.unit_number || 'Vehicle'} inspection`} description={`${formatDate(inspection.inspection_date)} · ${inspection.inspection_types?.name || 'Legacy inspection'}`} action={<div className="inline-actions"><a className="secondary-button button-link small" href={`/inspections/${inspection.id}/pdf`}>Export PDF</a><Link className="secondary-button button-link small" href="/inspections">Back to inspections</Link></div>} />
       <section className="form-card"><div className="form-card-heading"><div><span>Legacy inspection record</span><h2>{titleCase(inspection.result || inspection.workflow_status)}</h2></div></div><div className="detail-list"><div><dt>Inspector</dt><dd>{inspection.inspector_name || '—'}</dd></div><div><dt>Organization</dt><dd>{inspection.inspector_organization || '—'}</dd></div><div><dt>Location</dt><dd>{inspection.inspection_location || '—'}</dd></div><div><dt>Odometer</dt><dd>{inspection.odometer ?? '—'}</dd></div></div></section>
       {!!deficiencies?.length && <section className="panel"><div className="panel-heading"><h3>Deficiencies</h3><span>{deficiencies.length} recorded</span></div>{deficiencies.map((d:any)=><div className="mini-row" key={d.id}><span>{d.description}</span><strong>{titleCase(d.status)}</strong></div>)}</section>}
     </>
@@ -58,7 +58,7 @@ export default async function InspectionPage({ params, searchParams }: Props) {
   const statusLabel = inspection.workflow_status === 'draft' ? 'Draft' : titleCase(inspection.result || 'submitted')
 
   return <>
-    <PageHeader eyebrow="Inspections" title={`${inspection.vehicles?.unit_number || inspection.vehicles?.fleet_number || 'Vehicle'} inspection`} description={`${formatDate(inspection.inspection_date)} · ${statusLabel}`} action={<Link className="secondary-button button-link small" href="/inspections">Back to inspections</Link>} />
+    <PageHeader eyebrow="Inspections" title={`${inspection.vehicles?.unit_number || inspection.vehicles?.fleet_number || 'Vehicle'} inspection`} description={`${formatDate(inspection.inspection_date)} · ${statusLabel}`} action={<div className="inline-actions"><a className="primary-button button-link small" href={`/inspections/${inspection.id}/pdf`}>Export PDF</a><Link className="secondary-button button-link small" href="/inspections">Back to inspections</Link></div>} />
     {qs.saved && <div className="banner success"><div><strong>Draft saved</strong><span>You can return to this inspection later and continue where you left off.</span></div></div>}
     {qs.submitted && <div className="banner success"><div><strong>Inspection submitted</strong><span>The inspection is locked and any deficient items have been added to corrective-action tracking.</span></div></div>}
     {qs.error && <div className="banner danger"><div><strong>Inspection was not saved</strong><span>{qs.error}</span></div></div>}

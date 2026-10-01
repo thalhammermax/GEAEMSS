@@ -43,7 +43,7 @@ export default async function InspectionsPage() {
         || (templateRow?.scope_type === 'system' && isSystemInspector)
         || (templateRow?.scope_type === 'agency' && isAgencyAdmin && (accessRows ?? []).some((a:any)=>a.agency_id === vehicleRow?.agency_id && a.can_manage_fleet))
       )
-      return <tr key={r.id}><td>{formatDate(r.inspection_date)}</td><td><strong>{vehicleRow?.unit_number || vehicleRow?.fleet_number || '—'}</strong><div className="muted-code">{vehicleRow?.agencies?.short_name || vehicleRow?.agencies?.name || ''}</div></td><td>{r.inspection_types?.name || '—'}</td><td><span className={`pill ${cls}`}>{label}</span></td><td>{formatDate(r.next_due_date)}</td><td>{r.inspector_name || '—'}</td><td className="table-action"><Link href={`/inspections/${r.id}`}>{canResume ? 'Resume' : 'Open'}</Link></td></tr>
+      return <tr key={r.id}><td>{formatDate(r.inspection_date)}</td><td><strong>{vehicleRow?.unit_number || vehicleRow?.fleet_number || '—'}</strong><div className="muted-code">{vehicleRow?.agencies?.short_name || vehicleRow?.agencies?.name || ''}</div></td><td>{r.inspection_types?.name || '—'}</td><td><span className={`pill ${cls}`}>{label}</span></td><td>{formatDate(r.next_due_date)}</td><td>{r.inspector_name || '—'}</td><td className="table-action"><div className="inline-actions"><Link href={`/inspections/${r.id}`}>{canResume ? 'Resume' : 'Open'}</Link><a className="text-link" href={`/inspections/${r.id}/pdf`}>PDF</a></div></td></tr>
     })}</tbody></table>}</div>
   </>
 }

@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/page-header'
 import { CustomFieldInputs } from '@/components/custom-field-inputs'
 import { builtinFieldMap, fetchCustomFieldValues, fetchFieldDefinitions, isEnabled, isRequired } from '@/lib/record-fields'
 import { setVehicleActive, updateVehicle } from '../actions'
+import { formatDate, titleCase } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Vehicle' }
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; saved?: string }> }
@@ -14,12 +15,13 @@ export default async function VehiclePage({ params, searchParams }: Props) {
   const { id } = await params
   const qs = await searchParams
   const supabase = await createClient()
-  const [{ data: vehicle, error }, { data: agencies }, { data: types }, { data: statuses }, { data: narcoticsTemplates }, fieldResult, valueResult] = await Promise.all([
+  const [{ data: vehicle, error }, { data: agencies }, { data: types }, { data: statuses }, { data: narcoticsTemplates }, { data: completedInspections, error: inspectionHistoryError }, fieldResult, valueResult] = await Promise.all([
     supabase.from('vehicles').select('*, agencies(name, short_name), vehicle_types(name), vehicle_statuses(name)').eq('id', id).maybeSingle(),
     supabase.from('agencies').select('id, name').eq('active', true).order('name'),
     supabase.from('vehicle_types').select('id, name, narcotics_template_id').eq('active', true).order('sort_order'),
     supabase.from('vehicle_statuses').select('id, name').eq('active', true).order('sort_order'),
     supabase.from('narcotics_count_templates').select('id, name').eq('active', true).eq('scope_type', 'system').order('name'),
+    supabase.from('vehicle_inspections').select('id, inspection_date, workflow_status, result, next_due_date, inspector_name, submitted_at, inspection_types(name), inspection_form_versions(version_number, inspection_form_templates(name))').eq('vehicle_id', id).eq('workflow_status', 'submitted').order('inspection_date', { ascending: false }).order('submitted_at', { ascending: false }).limit(250),
     fetchFieldDefinitions(supabase, 'vehicle'),
     fetchCustomFieldValues(supabase, id),
   ])
@@ -75,5 +77,28 @@ export default async function VehiclePage({ params, searchParams }: Props) {
         </form>
       </section>
     </div>
+
+    <section className="report-section">
+      <div className="section-heading"><div><span>Inspection history</span><h2>Completed inspection forms</h2><p>Submitted inspections for this apparatus remain attached to the vehicle record, including the exact form version used at the time of inspection.</p></div>{vehicle.active && <Link className="primary-button small button-link" href={`/inspections/new?vehicle=${vehicle.id}`}>Start inspection</Link>}</div>
+      {inspectionHistoryError ? <div className="empty-state danger-text"><strong>Unable to load completed inspections</strong><span>{inspectionHistoryError.message}</span></div> : (completedInspections ?? []).length === 0 ? <div className="empty-state compact"><strong>No completed inspection forms yet</strong><span>Submitted inspections for this vehicle will appear here automatically.</span></div> : <div className="table-card"><table>
+        <thead><tr><th>Date</th><th>Inspection form</th><th>Result</th><th>Inspector</th><th>Next due</th><th></th></tr></thead>
+        <tbody>{(completedInspections ?? []).map((inspection:any) => {
+          const formVersion = Array.isArray(inspection.inspection_form_versions) ? inspection.inspection_form_versions[0] : inspection.inspection_form_versions
+          const template = Array.isArray(formVersion?.inspection_form_templates) ? formVersion?.inspection_form_templates[0] : formVersion?.inspection_form_templates
+          const inspectionType = Array.isArray(inspection.inspection_types) ? inspection.inspection_types[0] : inspection.inspection_types
+          const formLabel = template?.name || inspectionType?.name || 'Legacy inspection'
+          const resultLabel = titleCase(inspection.result || 'submitted')
+          const resultClass = inspection.result === 'passed' ? 'green' : inspection.result === 'passed_with_deficiencies' ? 'amber' : 'red'
+          return <tr key={inspection.id}>
+            <td><strong>{formatDate(inspection.inspection_date)}</strong>{inspection.submitted_at && <div className="muted-code">Submitted {new Date(inspection.submitted_at).toLocaleString()}</div>}</td>
+            <td><strong>{formLabel}</strong>{formVersion?.version_number && <div className="muted-code">Form version {formVersion.version_number}</div>}</td>
+            <td><span className={`pill ${resultClass}`}>{resultLabel}</span></td>
+            <td>{inspection.inspector_name || '—'}</td>
+            <td>{formatDate(inspection.next_due_date)}</td>
+            <td className="table-action"><div className="inline-actions"><Link href={`/inspections/${inspection.id}`}>Open</Link><a className="text-link" href={`/inspections/${inspection.id}/pdf`}>PDF</a></div></td>
+          </tr>
+        })}</tbody>
+      </table></div>}
+    </section>
   </>
 }
