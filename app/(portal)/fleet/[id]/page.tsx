@@ -16,8 +16,8 @@ export default async function VehiclePage({ params, searchParams }: Props) {
   const qs = await searchParams
   const supabase = await createClient()
   const [{ data: vehicle, error }, { data: agencies }, { data: types }, { data: statuses }, { data: narcoticsTemplates }, { data: completedInspections, error: inspectionHistoryError }, fieldResult, valueResult] = await Promise.all([
-    supabase.from('vehicles').select('*, agencies(name, short_name), vehicle_types(name), vehicle_statuses(name)').eq('id', id).maybeSingle(),
-    supabase.from('agencies').select('id, name').eq('active', true).order('name'),
+    supabase.from('vehicles').select('*, agencies(name, short_name, active), vehicle_types(name), vehicle_statuses(name)').eq('id', id).maybeSingle(),
+    supabase.from('agencies').select('id, name, active').order('name'),
     supabase.from('vehicle_types').select('id, name, narcotics_template_id').eq('active', true).order('sort_order'),
     supabase.from('vehicle_statuses').select('id, name').eq('active', true).order('sort_order'),
     supabase.from('narcotics_count_templates').select('id, name').eq('active', true).eq('scope_type', 'system').order('name'),
@@ -31,19 +31,21 @@ export default async function VehiclePage({ params, searchParams }: Props) {
   const custom = fieldResult.fields.filter((field) => field.source_type === 'custom')
   const req = (key: string, fallback = false) => isRequired(map, key, fallback)
   const title = vehicle.unit_number || vehicle.fleet_number || [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'Vehicle'
+  const agencyArchived = vehicle.agencies?.active === false
 
   return <>
     <PageHeader eyebrow="Fleet" title={title} description={`${vehicle.agencies?.name ?? 'Agency'} · ${vehicle.vehicle_types?.name ?? 'Vehicle record'}`} />
     {qs.saved && <div className="banner success"><div><strong>{qs.saved === 'archived' ? 'Vehicle archived' : qs.saved === 'restored' ? 'Vehicle restored' : 'Saved'}</strong><span>{qs.saved === 'archived' ? 'This vehicle is now excluded from active fleet workflows and reports. Historical records remain available.' : qs.saved === 'restored' ? 'This vehicle is active again and available for fleet and inspection workflows.' : 'Vehicle information was updated.'}</span></div></div>}
     {!vehicle.active && <div className="banner info"><div><strong>Archived vehicle</strong><span>This record is retained for history, but it is excluded from the current fleet, new inspections, compliance dashboards, and standard operational reports.</span></div></div>}
+    {agencyArchived && <div className="banner info"><div><strong>Parent agency archived</strong><span>This vehicle remains stored as-is but is excluded from production workflows until {vehicle.agencies?.name || 'the agency'} is restored.</span></div></div>}
     {qs.error && <div className="banner danger"><div><strong>Unable to save</strong><span>{qs.error}</span></div></div>}
 
     <div className="dashboard-columns detail-columns">
       <form action={updateVehicle} className="form-card">
         <input type="hidden" name="id" value={vehicle.id} />
-        <div className="form-card-heading"><div><span>Vehicle</span><h2>Master record</h2></div><span className={`pill ${vehicle.active ? 'green' : 'gray'}`}>{vehicle.active ? 'Active' : 'Archived'}</span></div>
+        <div className="form-card-heading"><div><span>Vehicle</span><h2>Master record</h2></div><span className={`pill ${vehicle.active && !agencyArchived ? 'green' : 'gray'}`}>{agencyArchived ? 'Agency archived' : vehicle.active ? 'Active' : 'Archived'}</span></div>
         <div className="form-grid three">
-          {isEnabled(map,'agency_id') && <label className="field"><span>Agency{req('agency_id',true) ? ' *' : ''}</span><select name="agency_id" required={req('agency_id',true)} defaultValue={vehicle.agency_id}><option value="">Select agency</option>{agencies?.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>}
+          {isEnabled(map,'agency_id') && <label className="field"><span>Agency{req('agency_id',true) ? ' *' : ''}</span><select name="agency_id" required={req('agency_id',true)} defaultValue={vehicle.agency_id}><option value="">Select agency</option>{agencies?.map((a) => <option key={a.id} value={a.id} disabled={!a.active && a.id !== vehicle.agency_id}>{a.name}{a.active ? '' : ' (Archived)'}</option>)}</select></label>}
           {isEnabled(map,'unit_number') && <label className="field"><span>Unit number{req('unit_number') ? ' *' : ''}</span><input name="unit_number" defaultValue={vehicle.unit_number ?? ''} required={req('unit_number')} /></label>}
           {isEnabled(map,'fleet_number') && <label className="field"><span>Fleet number{req('fleet_number') ? ' *' : ''}</span><input name="fleet_number" defaultValue={vehicle.fleet_number ?? ''} required={req('fleet_number')} /></label>}
           {isEnabled(map,'vehicle_type_id') && <label className="field"><span>Vehicle type{req('vehicle_type_id') ? ' *' : ''}</span><select name="vehicle_type_id" required={req('vehicle_type_id')} defaultValue={vehicle.vehicle_type_id ?? ''}><option value="">Select type</option>{types?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>}
@@ -70,7 +72,7 @@ export default async function VehiclePage({ params, searchParams }: Props) {
       <section className="panel">
         <div className="panel-heading"><h3>Record status</h3><span>Archive without deleting history</span></div>
         <p className="panel-copy">Archiving keeps licensing, inspection and audit history intact while removing the vehicle from normal production workflows, compliance calculations and standard reports.</p>
-        {vehicle.active && <p><Link className="primary-button small button-link" href={`/inspections/new?vehicle=${vehicle.id}`}>Start inspection</Link></p>}
+        {vehicle.active && !agencyArchived && <p><Link className="primary-button small button-link" href={`/inspections/new?vehicle=${vehicle.id}`}>Start inspection</Link></p>}
         <form action={setVehicleActive}>
           <input type="hidden" name="id" value={vehicle.id} />
           <input type="hidden" name="active" value={vehicle.active ? 'false' : 'true'} />
@@ -80,7 +82,7 @@ export default async function VehiclePage({ params, searchParams }: Props) {
     </div>
 
     <section className="report-section">
-      <div className="section-heading"><div><span>Inspection history</span><h2>Completed inspection forms</h2><p>Submitted inspections for this apparatus remain attached to the vehicle record, including the exact form version used at the time of inspection.</p></div>{vehicle.active && <Link className="primary-button small button-link" href={`/inspections/new?vehicle=${vehicle.id}`}>Start inspection</Link>}</div>
+      <div className="section-heading"><div><span>Inspection history</span><h2>Completed inspection forms</h2><p>Submitted inspections for this apparatus remain attached to the vehicle record, including the exact form version used at the time of inspection.</p></div>{vehicle.active && !agencyArchived && <Link className="primary-button small button-link" href={`/inspections/new?vehicle=${vehicle.id}`}>Start inspection</Link>}</div>
       {inspectionHistoryError ? <div className="empty-state danger-text"><strong>Unable to load completed inspections</strong><span>{inspectionHistoryError.message}</span></div> : (completedInspections ?? []).length === 0 ? <div className="empty-state compact"><strong>No completed inspection forms yet</strong><span>Submitted inspections for this vehicle will appear here automatically.</span></div> : <div className="table-card"><table>
         <thead><tr><th>Date</th><th>Inspection form</th><th>Result</th><th>Inspector</th><th>Next due</th><th></th></tr></thead>
         <tbody>{(completedInspections ?? []).map((inspection:any) => {

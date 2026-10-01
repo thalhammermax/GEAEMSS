@@ -29,13 +29,14 @@ export default async function AgencyPage({ params, searchParams }: Props) {
 
   return <>
     <PageHeader eyebrow="Agency Administration" title={agency.name} description="Agency details and active provider roster." action={<Link className="secondary-button button-link" href={`/personnel?agency=${agency.id}`}>View personnel</Link>} />
-    {qs.saved && <div className="banner success"><div><strong>Saved</strong><span>Agency information was updated.</span></div></div>}
+    {qs.saved && <div className="banner success"><div><strong>{qs.saved === 'archived' ? 'Agency archived' : qs.saved === 'restored' ? 'Agency restored' : 'Saved'}</strong><span>{qs.saved === 'archived' ? 'The agency is now excluded from normal production workflows. Its historical records and attached records remain intact.' : qs.saved === 'restored' ? 'The agency is active again. Active vehicles and other current records under the agency are available to production workflows again.' : 'Agency information was updated.'}</span></div></div>}
+    {!agency.active && <div className="banner info"><div><strong>Archived agency</strong><span>This organization remains available for history, but it and its apparatus are excluded from current fleet, new inspections, compliance dashboards and standard operational reports.</span></div></div>}
     {qs.error && <div className="banner danger"><div><strong>Unable to save</strong><span>{qs.error}</span></div></div>}
 
     <div className="dashboard-columns detail-columns">
       <form action={updateAgency} className="form-card">
         <input type="hidden" name="id" value={agency.id} />
-        <div className="form-card-heading"><div><span>Configuration</span><h2>Agency details</h2></div><span className={`pill ${agency.active ? 'green' : ''}`}>{agency.active ? 'Active' : 'Inactive'}</span></div>
+        <div className="form-card-heading"><div><span>Configuration</span><h2>Agency details</h2></div><span className={`pill ${agency.active ? 'green' : 'gray'}`}>{agency.active ? 'Active' : 'Archived'}</span></div>
         <div className="form-grid">
           {isEnabled(map,'name') && <label className="field"><span>Agency name{req('name',true) ? ' *' : ''}</span><input name="name" defaultValue={agency.name} required={req('name',true)} /></label>}
           {isEnabled(map,'short_name') && <label className="field"><span>Abbreviation{req('short_name') ? ' *' : ''}</span><input name="short_name" defaultValue={agency.short_name ?? ''} required={req('short_name')} /></label>}
@@ -45,12 +46,12 @@ export default async function AgencyPage({ params, searchParams }: Props) {
       </form>
 
       <section className="panel">
-        <div className="panel-heading"><h3>Agency status</h3><span>Controls whether the agency is active</span></div>
-        <p className="panel-copy">Inactivating an agency preserves its historical records and affiliations. It does not delete providers or credential history.</p>
+        <div className="panel-heading"><h3>Agency status</h3><span>Archive without deleting history</span></div>
+        <p className="panel-copy">Archiving preserves the agency, provider affiliations, vehicles, inspections, licenses and audit history. Current records beneath the agency are removed from normal production workflows until the agency is restored.</p>
         <form action={setAgencyActive}>
           <input type="hidden" name="id" value={agency.id} />
           <input type="hidden" name="active" value={agency.active ? 'false' : 'true'} />
-          <button className={agency.active ? 'secondary-button danger-outline' : 'primary-button'} type="submit">{agency.active ? 'Mark agency inactive' : 'Reactivate agency'}</button>
+          <button className={agency.active ? 'secondary-button danger-outline' : 'primary-button'} type="submit">{agency.active ? 'Archive agency' : 'Restore agency'}</button>
         </form>
       </section>
     </div>

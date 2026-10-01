@@ -24,10 +24,12 @@ export default async () => {
   // Narcotics is intentionally OFF by default during the initial staged rollout.
   // If migration 019 is not present yet, do not send controlled-substance reminders.
   if (moduleError || moduleSetting?.enabled !== true) return new Response('narcotics module disabled')
-  const { data: settings, error: settingsError } = await db.from('narcotics_agency_settings').select('*, agencies(name, short_name)').eq('enabled', true).eq('send_incomplete_report', true)
+  const { data: settings, error: settingsError } = await db.from('narcotics_agency_settings').select('*, agencies(name, short_name, active)').eq('enabled', true).eq('send_incomplete_report', true)
   if (settingsError) throw settingsError
 
   for (const setting of settings ?? []) {
+    const agencyRecord = Array.isArray(setting.agencies) ? setting.agencies[0] : setting.agencies
+    if (agencyRecord?.active !== true) continue
     const now = zonedParts(setting.timezone || 'America/Chicago')
     if (now.hour < Number(setting.report_hour ?? 8)) continue
     const { data: prior } = await db.from('narcotics_report_history').select('id').eq('agency_id', setting.agency_id).eq('report_date', now.date).eq('report_type', 'incomplete_daily_count').maybeSingle()
@@ -69,7 +71,7 @@ export default async () => {
       continue
     }
 
-    const agency = Array.isArray(setting.agencies) ? setting.agencies[0] : setting.agencies
+    const agency = agencyRecord
     const rows = missing.map((v) => { const type = Array.isArray(v.vehicle_types) ? v.vehicle_types[0] : v.vehicle_types; const status = !type?.narcotics_template_id ? 'No form configured for vehicle type' : drafts.has(v.id) ? 'Draft not submitted' : 'Not started'; return `<tr><td style="padding:8px;border-bottom:1px solid #ddd">${esc(v.unit_number || v.fleet_number || 'Unnumbered')}</td><td style="padding:8px;border-bottom:1px solid #ddd">${esc(status)}</td></tr>` }).join('')
     const subject = `Incomplete narcotics counts - ${agency?.short_name || agency?.name || 'Agency'} - ${now.date}`
     const html = `<div style="font-family:Arial,sans-serif;color:#17212b"><h2>GEAEMS Narcotics Count Report</h2><p>The following apparatus do not have a submitted narcotics count for <strong>${esc(now.date)}</strong>.</p><table style="border-collapse:collapse;width:100%;max-width:640px"><thead><tr><th style="text-align:left;padding:8px;border-bottom:2px solid #999">Apparatus</th><th style="text-align:left;padding:8px;border-bottom:2px solid #999">Status</th></tr></thead><tbody>${rows}</tbody></table><p style="margin-top:20px"><a href="https://portal.geaemss.org/narcotics">Open GEAEMS Portal</a></p></div>`

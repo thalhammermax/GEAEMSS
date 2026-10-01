@@ -11,7 +11,7 @@ function textValue(formData: FormData, key: string) {
 }
 
 function fail(path: string, message: string): never {
-  redirect(`${path}?error=${encodeURIComponent(message)}`)
+  redirect(`${path}${path.includes('?') ? '&' : '?'}error=${encodeURIComponent(message)}`)
 }
 
 async function agencyPayload(supabase: any, formData: FormData, path: string) {
@@ -86,5 +86,41 @@ export async function setAgencyActive(formData: FormData) {
   revalidatePath('/administration')
   revalidatePath('/administration/agencies')
   revalidatePath(`/administration/agencies/${id}`)
-  redirect(`/administration/agencies/${id}?saved=1`)
+  revalidatePath('/fleet')
+  revalidatePath('/inspections')
+  revalidatePath('/dashboard')
+  revalidatePath('/reports')
+  redirect(`/administration/agencies/${id}?saved=${active ? 'restored' : 'archived'}`)
+}
+
+export async function bulkSetAgencyActive(formData: FormData) {
+  const ids = formData.getAll('agency_ids')
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    .slice(0, 250)
+  const active = textValue(formData, 'active') === 'true'
+  const returnView = textValue(formData, 'return_view') === 'archived' ? 'archived' : 'active'
+
+  if (!ids.length) fail(`/administration/agencies?view=${returnView}`, 'Select at least one agency first.')
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('agencies')
+    .update({ active })
+    .in('id', ids)
+    .select('id')
+
+  if (error) fail(`/administration/agencies?view=${returnView}`, error.message)
+  const changed = data?.length ?? 0
+  if (!changed) fail(`/administration/agencies?view=${returnView}`, 'No agency records were changed. Check your administrative permissions.')
+
+  revalidatePath('/administration')
+  revalidatePath('/administration/agencies')
+  revalidatePath('/fleet')
+  revalidatePath('/inspections')
+  revalidatePath('/dashboard')
+  revalidatePath('/reports')
+
+  const destination = active ? 'active' : 'archived'
+  const label = active ? 'restored to current agencies' : 'archived'
+  redirect(`/administration/agencies?view=${destination}&notice=${encodeURIComponent(`${changed} agenc${changed === 1 ? 'y' : 'ies'} ${label}.`)}`)
 }

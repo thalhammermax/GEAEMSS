@@ -14,6 +14,9 @@ const emptyResult = () => Promise.resolve({ data: [] as any[], count: 0, error: 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const moduleStates = await getModuleStates(supabase)
+  const activeAgencyResult = await supabase.from('agencies').select('id').eq('active', true)
+  const activeAgencyIds = (activeAgencyResult.data ?? []).map((agency: any) => agency.id)
+  const agencies = { data: activeAgencyResult.data ?? [], count: activeAgencyIds.length, error: activeAgencyResult.error }
 
   const personnelEnabled = moduleStates.personnel
   const credentialsEnabled = moduleStates.credentials
@@ -23,7 +26,6 @@ export default async function DashboardPage() {
 
   const [
     providers,
-    agencies,
     vehicles,
     pending,
     expiredCredentials,
@@ -34,7 +36,6 @@ export default async function DashboardPage() {
     failedInspections,
     missingInspections,
     openDeficiencies,
-    criticalDeficiencies,
     expiringVehicleLicenses,
     expiredVehicleLicenses,
     missingVehicleLicenses,
@@ -42,24 +43,31 @@ export default async function DashboardPage() {
     narcoticsVehicles,
   ] = await Promise.all([
     personnelEnabled ? supabase.from('providers').select('*', { count: 'exact', head: true }) : emptyResult(),
-    supabase.from('agencies').select('*', { count: 'exact', head: true }).eq('active', true),
-    fleetEnabled ? supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('active', true) : emptyResult(),
+    fleetEnabled && activeAgencyIds.length ? supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('active', true).in('agency_id', activeAgencyIds) : emptyResult(),
     credentialsEnabled ? supabase.from('credential_submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending') : emptyResult(),
     credentialsEnabled ? supabase.from('provider_compliance').select('*', { count: 'exact', head: true }).eq('compliance_status', 'EXPIRED') : emptyResult(),
     credentialsEnabled ? supabase.from('provider_compliance').select('*', { count: 'exact', head: true }).eq('compliance_status', 'EXPIRING_SOON') : emptyResult(),
     credentialsEnabled ? supabase.from('provider_compliance').select('*', { count: 'exact', head: true }).eq('compliance_status', 'MISSING') : emptyResult(),
-    inspectionsEnabled ? supabase.from('vehicle_inspection_compliance').select('*', { count: 'exact', head: true }).eq('compliance_status', 'OVERDUE') : emptyResult(),
-    inspectionsEnabled ? supabase.from('vehicle_inspection_compliance').select('*', { count: 'exact', head: true }).eq('compliance_status', 'DUE_SOON') : emptyResult(),
-    inspectionsEnabled ? supabase.from('vehicle_inspection_compliance').select('*', { count: 'exact', head: true }).eq('compliance_status', 'FAILED') : emptyResult(),
-    inspectionsEnabled ? supabase.from('vehicle_inspection_compliance').select('*', { count: 'exact', head: true }).in('compliance_status', ['MISSING', 'SCHEDULE_MISSING']) : emptyResult(),
-    inspectionsEnabled ? supabase.from('vehicle_inspection_deficiencies').select('*', { count: 'exact', head: true }).eq('status', 'open') : emptyResult(),
-    inspectionsEnabled ? supabase.from('vehicle_inspection_deficiencies').select('*', { count: 'exact', head: true }).eq('status', 'open').eq('severity', 'critical') : emptyResult(),
-    fleetEnabled ? supabase.from('vehicle_license_compliance').select('*', { count: 'exact', head: true }).eq('compliance_status', 'EXPIRING_SOON') : emptyResult(),
-    fleetEnabled ? supabase.from('vehicle_license_compliance').select('*', { count: 'exact', head: true }).eq('compliance_status', 'EXPIRED') : emptyResult(),
-    fleetEnabled ? supabase.from('vehicle_license_compliance').select('*', { count: 'exact', head: true }).eq('compliance_status', 'MISSING') : emptyResult(),
-    narcoticsEnabled ? supabase.from('narcotics_agency_settings').select('agency_id, enabled, timezone') : emptyResult(),
-    narcoticsEnabled ? supabase.from('vehicles').select('id, agency_id, unit_number, fleet_number, narcotics_count_required, agencies(name, short_name), vehicle_types(name, narcotics_template_id)').eq('active', true).eq('narcotics_count_required', true).order('unit_number') : emptyResult(),
+    inspectionsEnabled && activeAgencyIds.length ? supabase.from('vehicle_inspection_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).eq('compliance_status', 'OVERDUE') : emptyResult(),
+    inspectionsEnabled && activeAgencyIds.length ? supabase.from('vehicle_inspection_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).eq('compliance_status', 'DUE_SOON') : emptyResult(),
+    inspectionsEnabled && activeAgencyIds.length ? supabase.from('vehicle_inspection_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).eq('compliance_status', 'FAILED') : emptyResult(),
+    inspectionsEnabled && activeAgencyIds.length ? supabase.from('vehicle_inspection_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).in('compliance_status', ['MISSING', 'SCHEDULE_MISSING']) : emptyResult(),
+    inspectionsEnabled ? supabase.from('vehicle_inspection_deficiencies').select('id, severity, vehicle_inspections(vehicles(active, agency_id))').eq('status', 'open').limit(10000) : emptyResult(),
+    fleetEnabled && activeAgencyIds.length ? supabase.from('vehicle_license_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).eq('compliance_status', 'EXPIRING_SOON') : emptyResult(),
+    fleetEnabled && activeAgencyIds.length ? supabase.from('vehicle_license_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).eq('compliance_status', 'EXPIRED') : emptyResult(),
+    fleetEnabled && activeAgencyIds.length ? supabase.from('vehicle_license_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).eq('compliance_status', 'MISSING') : emptyResult(),
+    narcoticsEnabled && activeAgencyIds.length ? supabase.from('narcotics_agency_settings').select('agency_id, enabled, timezone').in('agency_id', activeAgencyIds) : emptyResult(),
+    narcoticsEnabled && activeAgencyIds.length ? supabase.from('vehicles').select('id, agency_id, unit_number, fleet_number, narcotics_count_required, agencies(name, short_name), vehicle_types(name, narcotics_template_id)').eq('active', true).in('agency_id', activeAgencyIds).eq('narcotics_count_required', true).order('unit_number') : emptyResult(),
   ])
+
+  const activeAgencySet = new Set(activeAgencyIds)
+  const activeDeficiencyRows = (openDeficiencies.data ?? []).filter((row: any) => {
+    const inspection = relationOne<any>(row.vehicle_inspections)
+    const vehicle = relationOne<any>(inspection?.vehicles)
+    return vehicle?.active === true && !!vehicle?.agency_id && activeAgencySet.has(vehicle.agency_id)
+  })
+  const openDeficiencyCount = activeDeficiencyRows.length
+  const criticalDeficiencyCount = activeDeficiencyRows.filter((row: any) => row.severity === 'critical').length
 
   const narcoticsSettingMap = new Map((narcoticsSettings.data ?? []).map((setting: any) => [setting.agency_id, setting]))
   const narcoticsRows = narcoticsEnabled
@@ -84,7 +92,7 @@ export default async function DashboardPage() {
   const results = [
     providers, agencies, vehicles, pending, expiredCredentials, expiringCredentials, missingCredentials,
     overdueInspections, dueInspections, failedInspections, missingInspections, openDeficiencies,
-    criticalDeficiencies, expiringVehicleLicenses, expiredVehicleLicenses, missingVehicleLicenses,
+    expiringVehicleLicenses, expiredVehicleLicenses, missingVehicleLicenses,
     narcoticsSettings, narcoticsVehicles, narcoticsCounts,
   ]
   const firstError = results.find((result) => result.error)?.error
@@ -134,7 +142,7 @@ export default async function DashboardPage() {
       <section className="panel">
         <div className="panel-heading"><h3>System attention</h3><span>Enabled-module compliance exceptions</span></div>
         <div className="big-status"><div className={(personnelIssues + fleetCritical) > 0 ? 'status-icon warning' : 'status-icon success'}>{(personnelIssues + fleetCritical) > 0 ? <AlertIcon/> : <CheckIcon/>}</div><div><strong>{personnelIssues + fleetCritical}</strong><span>high-priority compliance exceptions</span></div></div>
-        {inspectionsEnabled && <><div className="mini-row"><span>Open fleet deficiencies</span><strong>{openDeficiencies.count ?? 0}</strong></div><div className="mini-row"><span>Critical open deficiencies</span><strong>{criticalDeficiencies.count ?? 0}</strong></div></>}
+        {inspectionsEnabled && <><div className="mini-row"><span>Open fleet deficiencies</span><strong>{openDeficiencyCount}</strong></div><div className="mini-row"><span>Critical open deficiencies</span><strong>{criticalDeficiencyCount}</strong></div></>}
       </section>
       <section className="panel">
         <div className="panel-heading"><h3>Environment</h3><span>Live application foundation</span></div>

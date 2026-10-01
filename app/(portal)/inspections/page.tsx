@@ -13,8 +13,8 @@ export default async function InspectionsPage() {
   const [{ data: roles }, { data: accessRows }, { data: inspections, error }, { data: deficiencies }] = await Promise.all([
     supabase.from('user_roles').select('role').eq('user_id', user!.id),
     supabase.from('user_agency_access').select('agency_id, can_manage_fleet').eq('user_id', user!.id),
-    supabase.from('vehicle_inspections').select('id, inspection_date, workflow_status, result, next_due_date, inspector_name, vehicles(active, agency_id, unit_number, fleet_number, agencies(short_name, name)), inspection_types(name), inspection_form_versions(inspection_form_templates(scope_type, agency_id))').order('created_at', { ascending: false }).limit(200),
-    supabase.from('vehicle_inspection_deficiencies').select('id, description, severity, status, correction_due_date, vehicle_inspections(vehicles(active))').eq('status', 'open').order('correction_due_date', { ascending: true }).limit(100),
+    supabase.from('vehicle_inspections').select('id, inspection_date, workflow_status, result, next_due_date, inspector_name, vehicles(active, agency_id, unit_number, fleet_number, agencies(short_name, name, active)), inspection_types(name), inspection_form_versions(inspection_form_templates(scope_type, agency_id))').order('created_at', { ascending: false }).limit(200),
+    supabase.from('vehicle_inspection_deficiencies').select('id, description, severity, status, correction_due_date, vehicle_inspections(vehicles(active, agencies(active)))').eq('status', 'open').order('correction_due_date', { ascending: true }).limit(100),
   ])
   const roleNames = new Set((roles ?? []).map((r:any)=>r.role))
   const isSystemAdmin = roleNames.has('system_admin')
@@ -25,12 +25,14 @@ export default async function InspectionsPage() {
   const canStartInspection = isSystemAdmin || isSystemInspector || (isAgencyAdmin && (accessRows ?? []).some((a:any) => a.can_manage_fleet))
   const rows = ((inspections ?? []) as any[]).filter((record) => {
     const vehicle = Array.isArray(record.vehicles) ? record.vehicles[0] : record.vehicles
-    return vehicle?.active === true
+    const agency = Array.isArray(vehicle?.agencies) ? vehicle.agencies[0] : vehicle?.agencies
+    return vehicle?.active === true && agency?.active === true
   })
   const activeDeficiencies = ((deficiencies ?? []) as any[]).filter((deficiency) => {
     const inspection = Array.isArray(deficiency.vehicle_inspections) ? deficiency.vehicle_inspections[0] : deficiency.vehicle_inspections
     const vehicle = Array.isArray(inspection?.vehicles) ? inspection.vehicles[0] : inspection?.vehicles
-    return vehicle?.active === true
+    const agency = Array.isArray(vehicle?.agencies) ? vehicle.agencies[0] : vehicle?.agencies
+    return vehicle?.active === true && agency?.active === true
   })
   const drafts = rows.filter((r)=>r.workflow_status === 'draft').length
   const submitted = rows.filter((r)=>r.workflow_status === 'submitted').length

@@ -1,9 +1,52 @@
-# GEAEMS Portal v0.10.1
+# GEAEMS Portal v0.10.2
 
 v0.10 adds staged **module rollout controls** and **multi-module reporting**. The initial production configuration enables Fleet, Inspections, and Reports while Personnel, Credentials, CE Tracking, and Narcotics remain disabled until GEAEMS is ready to roll them out.
 
 Production portal: `https://portal.geaemss.org`
 
+
+## New in v0.10.2 — Agency archiving for production rollout
+
+Agencies now use the existing `agencies.active` field as a true archive workflow, matching the vehicle archive behavior.
+
+### Current vs archived agencies
+
+**Administration → Agencies** now opens to **Current agencies** by default. System administrators can:
+
+- archive an individual agency
+- select multiple current agencies and choose **Archive selected**
+- review archived agencies separately
+- bulk restore archived agencies
+- open an archived agency without deleting any underlying history
+
+Archiving an agency does **not** modify or delete its providers, affiliations, vehicles, inspections, licenses, deficiencies, custom fields, or audit history.
+
+### Parent-agency behavior
+
+Vehicles keep their own active/archive state when an agency is archived. While the parent agency is archived, its otherwise-active vehicles are treated as unavailable for production. Restoring the agency automatically makes those still-active vehicles available again, while vehicles that were individually archived remain archived.
+
+Archived agencies and their vehicles are excluded from:
+
+- Current Agencies
+- Current Fleet
+- the Start Inspection vehicle picker
+- the active Inspections list and deficiency summary
+- vehicle licensing and inspection compliance views
+- dashboard fleet/compliance counts
+- standard Fleet, Inspection, Vehicle + Inspection, and Agency reports
+- scheduled Narcotics incomplete-count reminders
+
+Historical vehicle and inspection records remain accessible through the archived agency/vehicle records, including inspection PDF exports.
+
+### Database migration
+
+If migrations `001` through `019` are already installed, run only:
+
+```text
+supabase/migrations/020_agency_archive_compliance.sql
+```
+
+Migration 020 updates the vehicle-license and vehicle-inspection compliance views so active vehicles under an archived agency do not produce production compliance exceptions.
 
 ## New in v0.10.1 — Vehicle archiving for production rollout
 
