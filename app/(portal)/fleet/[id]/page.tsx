@@ -7,6 +7,7 @@ import { CustomFieldInputs } from '@/components/custom-field-inputs'
 import { builtinFieldMap, fetchCustomFieldValues, fetchFieldDefinitions, isEnabled, isRequired } from '@/lib/record-fields'
 import { setVehicleActive, updateVehicle } from '../actions'
 import { formatDate, titleCase } from '@/lib/format'
+import { getModuleStates } from '@/lib/modules'
 
 export const metadata: Metadata = { title: 'Vehicle' }
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; saved?: string }> }
@@ -15,12 +16,14 @@ export default async function VehiclePage({ params, searchParams }: Props) {
   const { id } = await params
   const qs = await searchParams
   const supabase = await createClient()
+  const moduleStates = await getModuleStates(supabase)
+  const narcoticsEnabled = moduleStates.narcotics
   const [{ data: vehicle, error }, { data: agencies }, { data: types }, { data: statuses }, { data: narcoticsTemplates }, { data: completedInspections, error: inspectionHistoryError }, fieldResult, valueResult] = await Promise.all([
     supabase.from('vehicles').select('*, agencies(name, short_name, active), vehicle_types(name), vehicle_statuses(name)').eq('id', id).maybeSingle(),
     supabase.from('agencies').select('id, name, active').order('name'),
     supabase.from('vehicle_types').select('id, name, narcotics_template_id').eq('active', true).order('sort_order'),
     supabase.from('vehicle_statuses').select('id, name').eq('active', true).order('sort_order'),
-    supabase.from('narcotics_count_templates').select('id, name').eq('active', true).eq('scope_type', 'system').order('name'),
+    narcoticsEnabled ? supabase.from('narcotics_count_templates').select('id, name').eq('active', true).eq('scope_type', 'system').order('name') : Promise.resolve({ data: [] as any[] }),
     supabase.from('vehicle_inspections').select('id, inspection_date, workflow_status, result, next_due_date, inspector_name, submitted_at, inspection_types(name), inspection_form_versions(version_number, inspection_form_templates(name))').eq('vehicle_id', id).eq('workflow_status', 'submitted').order('inspection_date', { ascending: false }).order('submitted_at', { ascending: false }).limit(250),
     fetchFieldDefinitions(supabase, 'vehicle'),
     fetchCustomFieldValues(supabase, id),
@@ -60,11 +63,13 @@ export default async function VehiclePage({ params, searchParams }: Props) {
           {isEnabled(map,'retired_date') && <label className="field"><span>Retired date{req('retired_date') ? ' *' : ''}</span><input name="retired_date" type="date" defaultValue={vehicle.retired_date ?? ''} required={req('retired_date')} /></label>}
         </div>
         {isEnabled(map,'notes') && <label className="field"><span>Notes{req('notes') ? ' *' : ''}</span><textarea name="notes" rows={3} defaultValue={vehicle.notes ?? ''} required={req('notes')} /></label>}
-        <div className="form-section-divider"><span>Narcotics Management</span></div>
-        <div className="form-grid">
-          <label className="checkbox-field"><input type="checkbox" name="narcotics_count_required" defaultChecked={vehicle.narcotics_count_required}/><span>Require a signed daily narcotics count for this apparatus</span></label>
-          <div className="field"><span>Daily count form</span><div className="readonly-field">{(() => { const currentType:any = (types ?? []).find((t:any) => t.id === vehicle.vehicle_type_id); const form:any = (narcoticsTemplates ?? []).find((t:any) => t.id === currentType?.narcotics_template_id); return form?.name || 'No form assigned to this vehicle type' })()}</div><small>Assigned automatically from the vehicle type in Narcotics → Forms & settings.</small></div>
-        </div>
+        {narcoticsEnabled && <>
+          <div className="form-section-divider"><span>Narcotics Management</span></div>
+          <div className="form-grid">
+            <label className="checkbox-field"><input type="checkbox" name="narcotics_count_required" defaultChecked={vehicle.narcotics_count_required}/><span>Require a signed daily narcotics count for this apparatus</span></label>
+            <div className="field"><span>Daily count form</span><div className="readonly-field">{(() => { const currentType:any = (types ?? []).find((t:any) => t.id === vehicle.vehicle_type_id); const form:any = (narcoticsTemplates ?? []).find((t:any) => t.id === currentType?.narcotics_template_id); return form?.name || 'No form assigned to this vehicle type' })()}</div><small>Assigned automatically from the vehicle type in Narcotics → Forms & settings.</small></div>
+          </div>
+        </>}
         <CustomFieldInputs fields={custom} values={valueResult.values} />
         <div className="form-actions"><button className="primary-button" type="submit">Save changes</button></div>
       </form>

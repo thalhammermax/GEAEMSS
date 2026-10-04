@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { builtinFieldMap, fetchFieldDefinitions, isEnabled, isRequired, saveCustomFieldValues, validateCustomFieldValues } from '@/lib/record-fields'
+import { getModuleStates } from '@/lib/modules'
 
 function textValue(formData: FormData, key: string) {
   const value = formData.get(key)
@@ -35,7 +36,8 @@ async function vehiclePayload(supabase: any, formData: FormData, path: string) {
     } else payload.year = null
   }
 
-  payload.narcotics_count_required = formData.get('narcotics_count_required') === 'on'
+  const moduleStates = await getModuleStates(supabase)
+  payload.narcotics_count_required = moduleStates.narcotics && formData.get('narcotics_count_required') === 'on'
 
   return payload
 }

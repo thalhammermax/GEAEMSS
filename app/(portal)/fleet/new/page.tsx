@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header'
 import { CustomFieldInputs } from '@/components/custom-field-inputs'
 import { builtinFieldMap, fetchFieldDefinitions, isEnabled, isRequired } from '@/lib/record-fields'
 import { createVehicle } from '../actions'
+import { getModuleStates } from '@/lib/modules'
 
 export const metadata: Metadata = { title: 'Add Vehicle' }
 type Props = { searchParams: Promise<{ error?: string }> }
@@ -12,6 +13,7 @@ type Props = { searchParams: Promise<{ error?: string }> }
 export default async function NewVehiclePage({ searchParams }: Props) {
   const { error } = await searchParams
   const supabase = await createClient()
+  const moduleStates = await getModuleStates(supabase)
   const [{ data: agencies }, { data: types }, { data: statuses }, fieldResult] = await Promise.all([
     supabase.from('agencies').select('id, name').eq('active', true).order('name'),
     supabase.from('vehicle_types').select('id, name').eq('active', true).order('sort_order'),
@@ -44,7 +46,7 @@ export default async function NewVehiclePage({ searchParams }: Props) {
         {isEnabled(map,'retired_date') && <label className="field"><span>Retired date{req('retired_date') ? ' *' : ''}</span><input name="retired_date" type="date" required={req('retired_date')} /></label>}
       </div>
       {isEnabled(map,'notes') && <label className="field"><span>Notes{req('notes') ? ' *' : ''}</span><textarea name="notes" rows={3} required={req('notes')} /></label>}
-      <div className="form-section-divider"><span>Narcotics Management</span></div><label className="checkbox-field"><input type="checkbox" name="narcotics_count_required"/><span>Require a signed daily narcotics count for this apparatus</span></label>
+      {moduleStates.narcotics && <><div className="form-section-divider"><span>Narcotics Management</span></div><label className="checkbox-field"><input type="checkbox" name="narcotics_count_required"/><span>Require a signed daily narcotics count for this apparatus</span></label></>}
       <CustomFieldInputs fields={custom} />
       <div className="form-actions"><Link className="secondary-button button-link" href="/fleet">Cancel</Link><button className="primary-button" type="submit">Create vehicle</button></div>
     </form>

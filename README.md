@@ -1,9 +1,36 @@
-# GEAEMS Portal v0.10.2
+# GEAEMS Portal v0.10.3
 
 v0.10 adds staged **module rollout controls** and **multi-module reporting**. The initial production configuration enables Fleet, Inspections, and Reports while Personnel, Credentials, CE Tracking, and Narcotics remain disabled until GEAEMS is ready to roll them out.
 
 Production portal: `https://portal.geaemss.org`
 
+
+## New in v0.10.3 — Narcotics requirement checkbox fix
+
+The Fleet vehicle setting **Require a signed daily narcotics count for this apparatus** is now truly operator-controlled.
+
+The original Narcotics migration contained a database trigger that automatically forced this field back to `true` for GEA ALS Non-Transport, GEA ALS Ambulance, and GEA Critical Care Transport vehicle types. That trigger overrode the value submitted by the Fleet form, which is why unchecking the box appeared to save and then immediately returned as checked.
+
+Migration 021 removes that forced behavior. When the Narcotics module is enabled, the Fleet checkbox can now be checked or unchecked normally for any vehicle type.
+
+When the Narcotics module is disabled:
+
+- the Narcotics Management section is hidden from Add/Edit Vehicle screens
+- vehicle saves force `narcotics_count_required = false`
+- migration 021 clears existing stale daily-count requirements while Narcotics is disabled
+- no ALS or critical-care vehicle is automatically re-enabled for Narcotics solely because of its vehicle type
+
+When Narcotics is rolled out later, enable the module and explicitly select which apparatus should require daily signed counts.
+
+### Database migration
+
+If migrations `001` through `020` are already installed, run only:
+
+```text
+supabase/migrations/021_narcotics_requirement_control.sql
+```
+
+Do not edit or rerun migration 008; migration 021 intentionally supersedes its old forced-ALS trigger.
 
 ## New in v0.10.2 — Agency archiving for production rollout
 
