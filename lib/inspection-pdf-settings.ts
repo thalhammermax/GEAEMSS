@@ -13,7 +13,6 @@ export type InspectionPdfSettings = {
   showResultBadge: boolean
   showFormVersion: boolean
   showSubmittedAt: boolean
-  showNextDue: boolean
   showInspectionId: boolean
   showOverallNotes: boolean
   showChecklist: boolean
@@ -42,7 +41,6 @@ export const DEFAULT_INSPECTION_PDF_SETTINGS: InspectionPdfSettings = {
   showResultBadge: true,
   showFormVersion: true,
   showSubmittedAt: true,
-  showNextDue: true,
   showInspectionId: true,
   showOverallNotes: true,
   showChecklist: true,
@@ -88,7 +86,6 @@ export function normalizeInspectionPdfSettings(row?: any | null): InspectionPdfS
     showResultBadge: bool(row.show_result_badge ?? row.showResultBadge, d.showResultBadge),
     showFormVersion: bool(row.show_form_version ?? row.showFormVersion, d.showFormVersion),
     showSubmittedAt: bool(row.show_submitted_at ?? row.showSubmittedAt, d.showSubmittedAt),
-    showNextDue: bool(row.show_next_due ?? row.showNextDue, d.showNextDue),
     showInspectionId: bool(row.show_inspection_id ?? row.showInspectionId, d.showInspectionId),
     showOverallNotes: bool(row.show_overall_notes ?? row.showOverallNotes, d.showOverallNotes),
     showChecklist: bool(row.show_checklist ?? row.showChecklist, d.showChecklist),

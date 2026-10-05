@@ -55,7 +55,7 @@ function dateTime(value: unknown) {
   if (!value) return '—'
   const parsed = new Date(String(value))
   if (Number.isNaN(parsed.getTime())) return safe(value)
-  return parsed.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' })
+  return parsed.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'America/Chicago' })
 }
 
 function titleCase(value: unknown) {
@@ -292,13 +292,11 @@ export async function buildInspectionPdf(data: InspectionPdfData) {
       ['Inspection type', data.inspectionType?.name || data.template?.name || '—'],
       ...(settings.showFormVersion ? [['Inspection form', data.template ? `${data.template.name} · Version ${data.formVersion?.version_number ?? '—'}` : 'Legacy inspection'] as [string, unknown]] : []),
       ['Inspector', data.inspection?.inspector_name || '—'],
-      ['Inspector organization', data.inspection?.inspector_organization || '—'],
     ]
     const rightItems: [string, unknown][] = [
       ['Location', data.inspection?.inspection_location || '—'],
       ['Odometer', data.inspection?.odometer ?? '—'],
       ...(settings.showSubmittedAt ? [['Submitted', dateTime(data.inspection?.submitted_at)] as [string, unknown]] : []),
-      ...(settings.showNextDue ? [['Next due', date(data.inspection?.next_due_date)] as [string, unknown]] : []),
       ...(settings.showInspectionId ? [['Inspection ID', data.inspection?.id || '—'] as [string, unknown]] : []),
     ]
 
@@ -466,7 +464,7 @@ export async function buildInspectionPdf(data: InspectionPdfData) {
     }
   }
 
-  const generated = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' })
+  const generated = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'America/Chicago' })
   const pages = pdf.getPages()
 
   pages.forEach((pdfPage, index) => {

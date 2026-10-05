@@ -23,8 +23,12 @@ export function localDateTimeToUtc(localValue: string, timeZone = 'America/Chica
 export function formatInTimeZone(value: string | Date, timeZone = 'America/Chicago', options?: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat('en-US', {
     timeZone,
-    dateStyle: 'medium',
-    timeStyle: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
     ...options,
   }).format(typeof value === 'string' ? new Date(value) : value)
 }
