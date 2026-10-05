@@ -1,13 +1,13 @@
 import { Fragment } from 'react'
 import type { ReportField } from '@/lib/report-catalog'
+import { formatDate, formatDateTime } from '@/lib/format'
 
 function formatValue(value:any, field?:ReportField) {
   if (value == null || value === '') return '—'
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   if (field?.type === 'date') {
     const raw = String(value)
-    const d = new Date(raw.length === 10 ? `${raw}T00:00:00` : raw)
-    if (!Number.isNaN(d.getTime())) return raw.length === 10 ? d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : d.toLocaleString()
+    return raw.length === 10 ? formatDate(raw) : formatDateTime(raw)
   }
   return String(value)
 }

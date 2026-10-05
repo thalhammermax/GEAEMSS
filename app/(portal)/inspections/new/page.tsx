@@ -25,7 +25,7 @@ export default async function StartInspectionPage({ searchParams }: Props) {
   const canPerformSystemInspection = isSystemAdmin || isSystemInspector
   const manageableAgencyIds = (accessRows ?? []).filter((r:any)=>r.can_manage_fleet).map((r:any)=>r.agency_id)
 
-  let vehicleQuery = supabase.from('vehicles').select('id, agency_id, vehicle_type_id, unit_number, fleet_number, year, make, model, active, agencies(name, short_name, active), vehicle_types(name, code)').eq('active', true).order('unit_number')
+  let vehicleQuery = supabase.from('vehicles').select('id, agency_id, vehicle_type_id, unit_number, fleet_number, year, make, model, active, agencies(name, short_name, address, active), vehicle_types(name, code)').eq('active', true).order('unit_number')
   if (!canPerformSystemInspection) {
     if (!manageableAgencyIds.length) return <><PageHeader eyebrow="Inspections" title="Start Inspection" description="Perform a digital vehicle inspection." /><div className="empty-state"><strong>No inspection access</strong><span>GEAEMS System inspections require the System Inspector or System Administrator role. Agency inspections require Fleet management permission and an agency-owned inspection form.</span></div></>
     vehicleQuery = vehicleQuery.in('agency_id', manageableAgencyIds)

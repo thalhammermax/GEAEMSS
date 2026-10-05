@@ -24,7 +24,7 @@ export default async function InspectionPage({ params, searchParams }: Props) {
   const isAgencyAdmin = roleNames.has('agency_admin')
   if (!isSystemAdmin && !isSystemInspector && !isAgencyAdmin) redirect('/my-profile')
 
-  const { data: inspection, error } = await supabase.from('vehicle_inspections').select('*, vehicles(id, agency_id, vehicle_type_id, unit_number, fleet_number, year, make, model, agencies(name, short_name), vehicle_types(name, code)), inspection_types(name)').eq('id', id).maybeSingle()
+  const { data: inspection, error } = await supabase.from('vehicle_inspections').select('*, vehicles(id, agency_id, vehicle_type_id, unit_number, fleet_number, year, make, model, agencies(name, short_name, address), vehicle_types(name, code)), inspection_types(name)').eq('id', id).maybeSingle()
   if (error || !inspection) notFound()
 
   const { data: deficiencies } = await supabase.from('vehicle_inspection_deficiencies').select('id, form_item_id, description, severity, status, correction_due_date, correction_notes').eq('vehicle_inspection_id', id).order('created_at')
@@ -60,9 +60,8 @@ export default async function InspectionPage({ params, searchParams }: Props) {
   return <>
     <PageHeader eyebrow="Inspections" title={`${inspection.vehicles?.unit_number || inspection.vehicles?.fleet_number || 'Vehicle'} inspection`} description={`${formatDate(inspection.inspection_date)} · ${statusLabel}`} action={<div className="inline-actions"><a className="primary-button button-link small" href={`/inspections/${inspection.id}/pdf`}>Export PDF</a><Link className="secondary-button button-link small" href="/inspections">Back to inspections</Link></div>} />
     {qs.saved && <div className="banner success"><div><strong>Draft saved</strong><span>You can return to this inspection later and continue where you left off.</span></div></div>}
-    {qs.submitted && <div className="banner success"><div><strong>Inspection submitted</strong><span>The inspection is locked and any deficient items have been added to corrective-action tracking.</span></div></div>}
+    {qs.submitted && <div className="banner success"><div><strong>Inspection submitted</strong><span>The inspection is locked and available for review or PDF export.</span></div></div>}
     {qs.error && <div className="banner danger"><div><strong>Inspection was not saved</strong><span>{qs.error}</span></div></div>}
-    {readOnly && !!deficiencies?.length && <div className="banner warning"><div><strong>{deficiencies.length} deficiency{deficiencies.length === 1 ? '' : 'ies'} recorded</strong><span>{deficiencies.filter((d:any)=>d.status === 'open').length} remain open.</span></div></div>}
     <DigitalInspectionForm inspectionId={inspection.id} vehicle={inspection.vehicles} template={template} formVersion={formVersion} sections={(sections ?? []) as any[]} responses={responses ?? []} readOnly={readOnly} defaults={inspection} />
   </>
 }

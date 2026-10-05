@@ -24,6 +24,7 @@ export default async function NewAgencyPage({ searchParams }: Props) {
       <div className="form-grid two">
         {isEnabled(map,'name') && <label className="field"><span>Agency name{req('name',true) ? ' *' : ''}</span><input name="name" required={req('name',true)} placeholder="Elgin Fire Department" /></label>}
         {isEnabled(map,'short_name') && <label className="field"><span>Abbreviation{req('short_name') ? ' *' : ''}</span><input name="short_name" required={req('short_name')} placeholder="EFD" maxLength={30} /></label>}
+        {isEnabled(map,'address') && <label className="field span-two"><span>Agency address{req('address') ? ' *' : ''}</span><textarea name="address" rows={2} required={req('address')} placeholder="123 Main St, Elgin, IL 60120" /><small>This is also used as the Agency Headquarters location on inspections when selected.</small></label>}
       </div>
       <CustomFieldInputs fields={custom} />
       <div className="form-actions"><Link className="secondary-button button-link" href="/administration/agencies">Cancel</Link><button className="primary-button" type="submit">Create agency</button></div>

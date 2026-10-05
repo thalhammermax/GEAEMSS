@@ -7,6 +7,7 @@ import { DeleteReportButton } from '@/components/delete-report-button'
 import { requireReportAdmin } from '@/lib/report-auth'
 import { runReport } from '@/lib/report-data'
 import { sourceFor, type ReportDefinition } from '@/lib/report-catalog'
+import { formatDateTime, formatHour24 } from '@/lib/format'
 
 export const metadata: Metadata = { title:'Report' }
 type Props = { params:Promise<{id:string}> }
@@ -16,7 +17,7 @@ function definitionFrom(row:any): ReportDefinition {
 }
 function scheduleText(row:any) {
   if (!row.schedule_enabled) return 'Not scheduled'
-  const hour = Number(row.schedule_hour ?? 8); const display = `${hour%12 || 12}:00 ${hour<12?'AM':'PM'}`
+  const display = formatHour24(row.schedule_hour ?? 8)
   if (row.schedule_frequency === 'weekly') return `Weekly on ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][row.schedule_weekday ?? 0]} at ${display}`
   if (row.schedule_frequency === 'monthly') return `Monthly on day ${row.schedule_day_of_month} at ${display}`
   return `Daily at ${display}`
@@ -42,7 +43,7 @@ export default async function SavedReportPage({ params }:Props) {
       <div><span>Data source</span><strong>{source?.label || report.data_source}</strong></div>
       <div><span>Rows</span><strong>{output?.rows?.length?.toLocaleString() ?? '—'}</strong></div>
       <div><span>Schedule</span><strong>{scheduleText(report)}</strong></div>
-      <div><span>Last delivery</span><strong>{report.last_run_at ? new Date(report.last_run_at).toLocaleString() : 'Never'}</strong></div>
+      <div><span>Last delivery</span><strong>{report.last_run_at ? formatDateTime(report.last_run_at) : 'Never'}</strong></div>
     </div>
 
     {output && <ReportTable rows={output.rows} fields={output.fields} columns={output.columns} groupField={definition.groupField} />}
@@ -52,7 +53,7 @@ export default async function SavedReportPage({ params }:Props) {
         {!report.schedule_enabled ? <div className="empty-inline">This report runs manually only.</div> : <dl className="detail-list"><div><dt>Frequency</dt><dd>{scheduleText(report)}</dd></div><div><dt>Time zone</dt><dd>{report.schedule_timezone}</dd></div><div><dt>Recipients</dt><dd>{(report.schedule_recipients ?? []).join(', ') || '—'}</dd></div><div><dt>Delivery format</dt><dd>{report.schedule_delivery_mode === 'inline_csv' ? 'Table + CSV attachment' : report.schedule_delivery_mode === 'csv' ? 'CSV attachment' : 'Table in email'}</dd></div></dl>}
       </section>
       <section className="panel"><div className="panel-heading"><div><span>Delivery history</span><h2>Recent scheduled runs</h2></div></div>
-        {(runs ?? []).length === 0 ? <div className="empty-inline">No scheduled deliveries yet.</div> : <div className="mini-log">{(runs ?? []).map((run:any) => <div key={run.id}><div><strong>{new Date(run.created_at).toLocaleString()}</strong><span>{run.row_count} rows · {run.recipient_count} recipients</span></div><span className={`pill ${run.status==='sent'?'green':run.status==='failed'?'red':'gray'}`}>{run.status}</span>{run.error_message && <small>{run.error_message}</small>}</div>)}</div>}
+        {(runs ?? []).length === 0 ? <div className="empty-inline">No scheduled deliveries yet.</div> : <div className="mini-log">{(runs ?? []).map((run:any) => <div key={run.id}><div><strong>{formatDateTime(run.created_at)}</strong><span>{run.row_count} rows · {run.recipient_count} recipients</span></div><span className={`pill ${run.status==='sent'?'green':run.status==='failed'?'red':'gray'}`}>{run.status}</span>{run.error_message && <small>{run.error_message}</small>}</div>)}</div>}
       </section>
     </div>
     <div className="danger-zone"><div><strong>Delete saved report</strong><span>This removes the saved definition, schedule, and delivery history. It does not delete any underlying system data.</span></div><DeleteReportButton reportId={report.id} /></div>

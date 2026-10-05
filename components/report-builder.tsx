@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ReportDefinition, ReportField, ReportFilter, ReportSource } from '@/lib/report-catalog'
 import { moduleLabel } from '@/lib/modules'
+import { formatDate, formatDateTime, formatHour24 } from '@/lib/format'
 import { previewReportAction, saveReportAction } from '@/app/(portal)/reports/actions'
 
 type Props = {
@@ -40,15 +41,13 @@ function formatValue(value: any, field?: ReportField) {
   if (value == null || value === '') return '—'
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   if (field?.type === 'date') {
-    const d = new Date(String(value).length === 10 ? `${value}T00:00:00` : value)
-    if (!Number.isNaN(d.getTime())) return d.toLocaleString(undefined, String(value).length === 10 ? { year:'numeric', month:'short', day:'numeric' } : { year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
+    return String(value).length === 10 ? formatDate(String(value)) : formatDateTime(String(value))
   }
   return String(value)
 }
 
 function hourLabel(hour: number) {
-  const h = hour % 12 || 12
-  return `${h}:00 ${hour < 12 ? 'AM' : 'PM'}`
+  return formatHour24(hour)
 }
 
 export function ReportBuilder({ sources, fieldsBySource, initial, presetName }: Props) {

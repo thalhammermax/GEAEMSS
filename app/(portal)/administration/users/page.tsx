@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { inviteProviderUser } from './actions'
+import { formatDateTime } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'User Management' }
 type Props = { searchParams: Promise<{ error?: string; notice?: string }> }
@@ -56,6 +57,6 @@ export default async function UsersPage({ searchParams }: Props) {
       </form>
     </section>
 
-    <div className="table-card">{authUsers.length === 0 ? <div className="empty-state"><strong>No Auth users available</strong><span>{configError || 'No portal accounts have been created yet.'}</span></div> : <table><thead><tr><th>User</th><th>Linked provider</th><th>Roles</th><th>Last sign-in</th><th>Status</th><th></th></tr></thead><tbody>{authUsers.map((u:any) => { const profile:any = profileMap.get(u.id); const provider:any = (providers ?? []).find((p:any) => p.id === profile?.provider_id); const userRoles = roleMap.get(u.id) ?? []; return <tr key={u.id}><td><strong>{profile?.display_name || u.email || 'User'}</strong><div className="muted-code">{u.email}</div></td><td>{provider ? <Link href={`/personnel/${provider.id}`}>{provider.last_name}, {provider.preferred_name || provider.first_name}</Link> : <span className="muted-code">Not linked</span>}</td><td>{userRoles.length ? userRoles.map((r) => r.replace('_',' ')).join(', ') : 'No role'}</td><td>{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : 'Never'}</td><td><span className={`pill ${profile?.active === true ? 'green' : ''}`}>{!profile ? 'Unprovisioned' : profile.active ? 'Active' : 'Disabled'}</span></td><td className="table-action"><Link href={`/administration/users/${u.id}`}>Manage</Link></td></tr> })}</tbody></table>}</div>
+    <div className="table-card">{authUsers.length === 0 ? <div className="empty-state"><strong>No Auth users available</strong><span>{configError || 'No portal accounts have been created yet.'}</span></div> : <table><thead><tr><th>User</th><th>Linked provider</th><th>Roles</th><th>Last sign-in</th><th>Status</th><th></th></tr></thead><tbody>{authUsers.map((u:any) => { const profile:any = profileMap.get(u.id); const provider:any = (providers ?? []).find((p:any) => p.id === profile?.provider_id); const userRoles = roleMap.get(u.id) ?? []; return <tr key={u.id}><td><strong>{profile?.display_name || u.email || 'User'}</strong><div className="muted-code">{u.email}</div></td><td>{provider ? <Link href={`/personnel/${provider.id}`}>{provider.last_name}, {provider.preferred_name || provider.first_name}</Link> : <span className="muted-code">Not linked</span>}</td><td>{userRoles.length ? userRoles.map((r) => r.replace('_',' ')).join(', ') : 'No role'}</td><td>{u.last_sign_in_at ? formatDateTime(u.last_sign_in_at) : 'Never'}</td><td><span className={`pill ${profile?.active === true ? 'green' : ''}`}>{!profile ? 'Unprovisioned' : profile.active ? 'Active' : 'Disabled'}</span></td><td className="table-action"><Link href={`/administration/users/${u.id}`}>Manage</Link></td></tr> })}</tbody></table>}</div>
   </>
 }

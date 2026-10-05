@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatDateTime } from '@/lib/format'
 import { relationOne } from '@/lib/narcotics'
 
 export const metadata: Metadata = { title: 'Narcotics History' }
@@ -118,7 +118,7 @@ export default async function NarcoticsHistoryPage({ searchParams }: Props) {
           const agency = relationOne<any>(vehicle?.agencies)
           const template = relationOne<any>(count.narcotics_count_templates)
           return <tr key={count.id}>
-            <td><strong>{formatDate(count.count_date)}</strong>{count.signed_at && <div className="muted-code">{new Date(count.signed_at).toLocaleString()}</div>}</td>
+            <td><strong>{formatDate(count.count_date)}</strong>{count.signed_at && <div className="muted-code">{formatDateTime(count.signed_at)}</div>}</td>
             <td>{agency?.short_name || agency?.name || '—'}</td>
             <td><strong>{vehicle?.unit_number || vehicle?.fleet_number || 'Unnumbered'}</strong></td>
             <td>{template?.name || '—'}</td>

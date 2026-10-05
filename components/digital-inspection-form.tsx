@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { saveInspection } from '@/app/(portal)/inspections/actions'
 import { InspectionSection } from '@/components/inspection-section'
+import { InspectionLocationField } from '@/components/inspection-location-field'
 
 type Section = { id: string; title: string; sort_order: number; inspection_form_items: any[] }
 
@@ -40,7 +41,7 @@ export function DigitalInspectionForm({ inspectionId, vehicle, template, formVer
           <label className="field"><span>Inspection date *</span><input name="inspection_date" type="date" required defaultValue={defaults.inspection_date ?? new Date().toISOString().slice(0,10)} disabled={readOnly} /></label>
           <label className="field"><span>Inspector *</span><input name="inspector_name" required defaultValue={defaults.inspector_name ?? ''} disabled={readOnly} /></label>
           <label className="field"><span>Inspector organization</span><input name="inspector_organization" defaultValue={defaults.inspector_organization ?? vehicle.agencies?.name ?? ''} disabled={readOnly} /></label>
-          <label className="field"><span>Inspection location</span><input name="inspection_location" defaultValue={defaults.inspection_location ?? ''} disabled={readOnly} /></label>
+          <InspectionLocationField defaultValue={defaults.inspection_location ?? ''} agencyAddress={vehicle.agencies?.address ?? ''} readOnly={readOnly} />
           <label className="field"><span>Odometer</span><input name="odometer" type="number" min="0" step="1" defaultValue={defaults.odometer ?? ''} disabled={readOnly} /></label>
           <label className="field"><span>Final disposition</span><select name="final_result" defaultValue={defaults.result && defaults.result !== 'passed' ? defaults.result : 'passed_with_deficiencies'} disabled={readOnly}><option value="passed_with_deficiencies">Pass with deficiencies</option><option value="failed">Fail inspection</option><option value="out_of_service">Out of service</option></select><small>If there are no deficient items, submission is automatically recorded as Passed.</small></label>
           <label className="field span-full"><span>Overall notes</span><textarea name="inspection_notes" rows={3} defaultValue={defaults.notes ?? ''} disabled={readOnly} /></label>

@@ -20,11 +20,11 @@ async function agencyPayload(supabase: any, formData: FormData, path: string) {
   const map = builtinFieldMap(fields)
   const payload: Record<string, string | null> = {}
 
-  for (const key of ['name','short_name']) {
+  for (const key of ['name','short_name','address']) {
     if (!isEnabled(map, key)) continue
     const value = textValue(formData, key)
     if (isRequired(map, key, key === 'name') && !value) fail(path, `${map.get(key)?.label ?? key} is required.`)
-    payload[key] = key === 'short_name' ? (value || null) : value
+    payload[key] = key === 'name' ? value : (value || null)
   }
   return payload
 }

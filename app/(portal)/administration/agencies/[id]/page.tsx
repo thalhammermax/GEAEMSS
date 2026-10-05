@@ -15,7 +15,7 @@ export default async function AgencyPage({ params, searchParams }: Props) {
   const qs = await searchParams
   const supabase = await createClient()
   const [{ data: agency, error }, { data: roster }, fieldResult, valueResult] = await Promise.all([
-    supabase.from('agencies').select('id, name, short_name, active').eq('id', id).maybeSingle(),
+    supabase.from('agencies').select('id, name, short_name, address, active').eq('id', id).maybeSingle(),
     supabase.from('provider_agencies').select('id, employee_id, is_primary, providers(id, first_name, last_name, provider_number, provider_levels(name), provider_statuses(name))').eq('agency_id', id).eq('active', true),
     fetchFieldDefinitions(supabase, 'agency'),
     fetchCustomFieldValues(supabase, id),
@@ -40,6 +40,7 @@ export default async function AgencyPage({ params, searchParams }: Props) {
         <div className="form-grid">
           {isEnabled(map,'name') && <label className="field"><span>Agency name{req('name',true) ? ' *' : ''}</span><input name="name" defaultValue={agency.name} required={req('name',true)} /></label>}
           {isEnabled(map,'short_name') && <label className="field"><span>Abbreviation{req('short_name') ? ' *' : ''}</span><input name="short_name" defaultValue={agency.short_name ?? ''} required={req('short_name')} /></label>}
+          {isEnabled(map,'address') && <label className="field span-two"><span>Agency address{req('address') ? ' *' : ''}</span><textarea name="address" rows={2} defaultValue={agency.address ?? ''} required={req('address')} placeholder="123 Main St, Elgin, IL 60120" /><small>This is also used as the Agency Headquarters location on inspections when selected.</small></label>}
         </div>
         <CustomFieldInputs fields={custom} values={valueResult.values} />
         <div className="form-actions"><button className="primary-button" type="submit">Save changes</button></div>

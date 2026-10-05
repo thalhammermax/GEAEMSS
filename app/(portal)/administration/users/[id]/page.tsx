@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resendPasswordSetup, saveAgencyAccess, saveUserRoles, setUserActive } from '../actions'
+import { formatDateTime } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Manage User' }
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; notice?: string }> }
@@ -70,7 +71,7 @@ export default async function ManageUserPage({ params, searchParams }: Props) {
     <div className="profile-grid">
       <section className="form-card compact-card">
         <div className="form-card-heading"><div><span>Account</span><h2>Login identity</h2></div><span className={`pill ${profile?.active !== false ? 'green' : ''}`}>{profile?.active !== false ? 'Active' : 'Disabled'}</span></div>
-        <dl className="detail-list"><div><dt>Username</dt><dd>{authUser?.email || 'Unavailable'}</dd></div><div><dt>Email confirmed</dt><dd>{authUser?.email_confirmed_at ? 'Yes' : 'No'}</dd></div><div><dt>Last sign-in</dt><dd>{authUser?.last_sign_in_at ? new Date(authUser.last_sign_in_at).toLocaleString() : 'Never'}</dd></div><div><dt>Created</dt><dd>{authUser?.created_at ? new Date(authUser.created_at).toLocaleString() : 'Unavailable'}</dd></div>{provider && <div><dt>Provider</dt><dd><Link className="text-link" href={`/personnel/${provider.id}`}>{provider.last_name}, {provider.preferred_name || provider.first_name}</Link></dd></div>}</dl>
+        <dl className="detail-list"><div><dt>Username</dt><dd>{authUser?.email || 'Unavailable'}</dd></div><div><dt>Email confirmed</dt><dd>{authUser?.email_confirmed_at ? 'Yes' : 'No'}</dd></div><div><dt>Last sign-in</dt><dd>{authUser?.last_sign_in_at ? formatDateTime(authUser.last_sign_in_at) : 'Never'}</dd></div><div><dt>Created</dt><dd>{authUser?.created_at ? formatDateTime(authUser.created_at) : 'Unavailable'}</dd></div>{provider && <div><dt>Provider</dt><dd><Link className="text-link" href={`/personnel/${provider.id}`}>{provider.last_name}, {provider.preferred_name || provider.first_name}</Link></dd></div>}</dl>
         <div className="form-actions split-actions"><form action={resendPasswordSetup}><input type="hidden" name="user_id" value={id}/><button className="secondary-button" type="submit" disabled={!authUser?.email}>Send password setup/reset</button></form><form action={setUserActive}><input type="hidden" name="user_id" value={id}/><input type="hidden" name="active" value={profile?.active === false ? 'true' : 'false'}/><button className={`secondary-button ${profile?.active === false ? '' : 'danger-outline'}`} type="submit">{profile?.active === false ? 'Enable account' : 'Disable account'}</button></form></div>
       </section>
 

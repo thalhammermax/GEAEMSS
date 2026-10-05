@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/page-header'
 import { requireReportAdmin } from '@/lib/report-auth'
 import { BUILTIN_REPORTS, sourceAvailableForModules, sourceFor } from '@/lib/report-catalog'
 import { enabledModuleKeys, getModuleStates } from '@/lib/modules'
+import { formatDateTime, formatHour24 } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Reports' }
 
@@ -12,8 +13,7 @@ type Props = { searchParams: Promise<{ notice?: string; error?: string }> }
 function scheduleLabel(report: any) {
   if (!report.schedule_enabled) return 'Manual only'
   const frequency = report.schedule_frequency === 'daily' ? 'Daily' : report.schedule_frequency === 'weekly' ? 'Weekly' : 'Monthly'
-  const h = Number(report.schedule_hour ?? 8); const hour = h % 12 || 12; const suffix = h < 12 ? 'AM' : 'PM'
-  return `${frequency} · ${hour}:00 ${suffix}`
+  return `${frequency} · ${formatHour24(report.schedule_hour ?? 8)}`
 }
 
 export default async function ReportsPage({ searchParams }: Props) {
@@ -47,7 +47,7 @@ export default async function ReportsPage({ searchParams }: Props) {
         <td><strong>{report.name}</strong>{report.description && <div className="muted-code">{report.description}</div>}</td>
         <td>{sourceFor(report.data_source)?.label || report.data_source}{!sourceAvailableForModules(report.data_source, enabledModules) && <div className="muted-code">Required module currently disabled</div>}</td>
         <td><span className={`pill ${report.schedule_enabled ? 'green' : 'gray'}`}>{scheduleLabel(report)}</span>{report.schedule_enabled && <div className="muted-code">{(report.schedule_recipients ?? []).length} recipient{(report.schedule_recipients ?? []).length === 1 ? '' : 's'} · {report.schedule_timezone}</div>}</td>
-        <td>{report.last_run_at ? <><strong>{new Date(report.last_run_at).toLocaleString()}</strong><div className="muted-code">{report.last_run_status || '—'}</div></> : 'Never'}</td>
+        <td>{report.last_run_at ? <><strong>{formatDateTime(report.last_run_at)}</strong><div className="muted-code">{report.last_run_status || '—'}</div></> : 'Never'}</td>
         {isSystemAdmin && <td>{report.owner_user_id === user.id ? 'You' : 'Another administrator'}</td>}
         <td className="table-action"><Link href={`/reports/${report.id}`}>Open</Link></td>
       </tr>)}</tbody></table></div>}

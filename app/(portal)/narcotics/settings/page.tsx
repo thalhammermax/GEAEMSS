@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { saveNarcoticsAgencySettings, saveNarcoticsVehicleTypeTemplate } from '../actions'
+import { formatHour24 } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Narcotics Settings' }
 type Props = { searchParams: Promise<{ error?: string; notice?: string }> }
@@ -89,7 +90,7 @@ export default async function NarcoticsSettingsPage({ searchParams }: Props) {
           <input type="hidden" name="agency_id" value={agency.id}/>
           <div className="form-card-heading"><div><span>Agency settings</span><h2>{agency.name}</h2></div></div>
           <div className="form-grid two">
-            <label className="field"><span>Daily report hour</span><select name="report_hour" defaultValue={String(setting.report_hour ?? 8)}>{Array.from({length:24},(_,hour) => <option key={hour} value={hour}>{new Intl.DateTimeFormat('en-US',{hour:'numeric',hour12:true,timeZone:'UTC'}).format(new Date(Date.UTC(2020,0,1,hour)))}</option>)}</select></label>
+            <label className="field"><span>Daily report hour</span><select name="report_hour" defaultValue={String(setting.report_hour ?? 8)}>{Array.from({length:24},(_,hour) => <option key={hour} value={hour}>{formatHour24(hour)}</option>)}</select></label>
             <label className="field"><span>Time zone</span><input name="timezone" defaultValue={setting.timezone || 'America/Chicago'}/></label>
             <label className="field span-two"><span>Electronic signature attestation</span><textarea name="signature_attestation" rows={3} defaultValue={setting.signature_attestation || 'I attest that I personally performed this narcotics inventory count and that the quantities entered are accurate to the best of my knowledge.'}/></label>
           </div>

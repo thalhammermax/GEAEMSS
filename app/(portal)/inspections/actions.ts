@@ -42,6 +42,18 @@ export async function saveInspection(formData: FormData) {
   }))
 
   const supabase = await createClient()
+  let inspectionLocation = textValue(formData, 'inspection_location')
+  if (!inspectionLocation && formData.get('use_agency_headquarters') === 'on') {
+    const { data: vehicle, error: vehicleError } = await supabase
+      .from('vehicles')
+      .select('agencies(address)')
+      .eq('id', vehicleId)
+      .maybeSingle()
+    if (vehicleError) fail(returnPath, vehicleError.message)
+    const agency = Array.isArray(vehicle?.agencies) ? vehicle?.agencies[0] : vehicle?.agencies
+    inspectionLocation = typeof agency?.address === 'string' ? agency.address.trim() : ''
+  }
+
   const { data, error } = await supabase.rpc('save_digital_vehicle_inspection', {
     p_inspection_id: inspectionId,
     p_vehicle_id: vehicleId,
@@ -49,7 +61,7 @@ export async function saveInspection(formData: FormData) {
     p_inspection_date: inspectionDate,
     p_inspector_name: textValue(formData, 'inspector_name'),
     p_inspector_organization: textValue(formData, 'inspector_organization'),
-    p_inspection_location: textValue(formData, 'inspection_location'),
+    p_inspection_location: inspectionLocation,
     p_odometer: odometer,
     p_notes: textValue(formData, 'inspection_notes'),
     p_mode: mode,

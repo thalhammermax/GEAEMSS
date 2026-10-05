@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/page-header'
 import { CustomFieldInputs } from '@/components/custom-field-inputs'
 import { builtinFieldMap, fetchCustomFieldValues, fetchFieldDefinitions, isEnabled, isRequired } from '@/lib/record-fields'
 import { setVehicleActive, updateVehicle } from '../actions'
-import { formatDate, titleCase } from '@/lib/format'
+import { formatDate, formatDateTime, titleCase } from '@/lib/format'
 import { getModuleStates } from '@/lib/modules'
 
 export const metadata: Metadata = { title: 'Vehicle' }
@@ -98,7 +98,7 @@ export default async function VehiclePage({ params, searchParams }: Props) {
           const resultLabel = titleCase(inspection.result || 'submitted')
           const resultClass = inspection.result === 'passed' ? 'green' : inspection.result === 'passed_with_deficiencies' ? 'amber' : 'red'
           return <tr key={inspection.id}>
-            <td><strong>{formatDate(inspection.inspection_date)}</strong>{inspection.submitted_at && <div className="muted-code">Submitted {new Date(inspection.submitted_at).toLocaleString()}</div>}</td>
+            <td><strong>{formatDate(inspection.inspection_date)}</strong>{inspection.submitted_at && <div className="muted-code">Submitted {formatDateTime(inspection.submitted_at)}</div>}</td>
             <td><strong>{formLabel}</strong>{formVersion?.version_number && <div className="muted-code">Form version {formVersion.version_number}</div>}</td>
             <td><span className={`pill ${resultClass}`}>{resultLabel}</span></td>
             <td>{inspection.inspector_name || '—'}</td>
