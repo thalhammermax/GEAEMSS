@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
+import { requireUser, sessionRoleRows, sessionAgencyAccessRows } from '@/lib/session'
 import {
   createInspectionFormDraft,
   publishInspectionFormDraft,
@@ -31,12 +32,12 @@ export default async function InspectionFormEditorPage({ params, searchParams }:
   const { id } = await params
   const qs = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) redirect('/login')
 
   const [{ data: roles }, { data: access }, { data: template, error: templateError }] = await Promise.all([
-    supabase.from('user_roles').select('role').eq('user_id', user.id),
-    supabase.from('user_agency_access').select('agency_id, can_manage_fleet').eq('user_id', user.id),
+    sessionRoleRows(),
+    sessionAgencyAccessRows(),
     supabase.from('inspection_form_templates').select('id, code, name, description, scope_type, agency_id, active, vehicle_types(name, code), inspection_types(name), agencies(name, short_name)').eq('id', id).maybeSingle(),
   ])
   if (templateError || !template) notFound()

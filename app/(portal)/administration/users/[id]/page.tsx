@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resendPasswordSetup, saveAgencyAccess, saveUserRoles, setUserActive } from '../actions'
 import { formatDateTime } from '@/lib/format'
+import { requireUser } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Manage User' }
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; notice?: string }> }
@@ -14,7 +15,7 @@ export default async function ManageUserPage({ params, searchParams }: Props) {
   const { id } = await params
   const { error, notice } = await searchParams
   const supabase = await createClient()
-  const { data: { user: currentUser } } = await supabase.auth.getUser()
+  const currentUser = await requireUser()
   if (!currentUser) redirect('/login')
   const { data: systemRole } = await supabase.from('user_roles').select('role').eq('user_id', currentUser.id).eq('role','system_admin').maybeSingle()
   if (!systemRole) redirect('/dashboard')

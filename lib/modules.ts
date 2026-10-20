@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type ModuleKey =
@@ -33,7 +34,9 @@ export function defaultModuleStates(): ModuleStateMap {
   return Object.fromEntries(MODULE_CATALOG.map((module) => [module.key, module.defaultEnabled])) as ModuleStateMap
 }
 
-export async function getModuleStates(supabase: SupabaseClient): Promise<ModuleStateMap> {
+// Memoized per request: because createClient() is itself cached, every caller
+// in one request passes the same client instance and the query runs once.
+export const getModuleStates = cache(async (supabase: SupabaseClient): Promise<ModuleStateMap> => {
   const states = defaultModuleStates()
   const { data, error } = await supabase
     .from('system_module_settings')
@@ -49,7 +52,7 @@ export async function getModuleStates(supabase: SupabaseClient): Promise<ModuleS
     }
   }
   return states
-}
+})
 
 export function enabledModuleKeys(states: ModuleStateMap) {
   return MODULE_CATALOG.filter((module) => states[module.key]).map((module) => module.key)

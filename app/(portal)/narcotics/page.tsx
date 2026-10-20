@@ -3,16 +3,17 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { dateInTimeZone, relationOne } from '@/lib/narcotics'
+import { requireUser, sessionRoleRows } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Narcotics Management' }
 
 export default async function NarcoticsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) return null
   const { data: profile } = await supabase.from('profiles').select('provider_id').eq('id', user.id).maybeSingle()
   const [{ data: roles }, { data: vehicles }, { data: settings }, { data: memberships }, { data: recent }] = await Promise.all([
-    supabase.from('user_roles').select('role').eq('user_id', user.id),
+    sessionRoleRows(),
     supabase.from('vehicles').select('id, agency_id, unit_number, fleet_number, narcotics_count_required, agencies(name, short_name), vehicle_types(name, narcotics_template_id)').eq('active', true).eq('narcotics_count_required', true).order('unit_number'),
     supabase.from('narcotics_agency_settings').select('*'),
     profile?.provider_id ? supabase.from('provider_agencies').select('agency_id').eq('provider_id', profile.provider_id).eq('active', true) : Promise.resolve({ data: [] as any[] }),

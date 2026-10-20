@@ -1,14 +1,8 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getSessionContext } from '@/lib/session'
 
 export default async function Home() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', user.id)
-  const roleNames = new Set((roles ?? []).map((row: { role: string }) => row.role))
-  const isAdmin = roleNames.has('system_admin') || roleNames.has('agency_admin')
-  const isSystemInspector = roleNames.has('system_inspector')
-  redirect(isAdmin ? '/dashboard' : isSystemInspector ? '/inspections' : '/my-profile')
+  const session = await getSessionContext()
+  if (!session) redirect('/login')
+  redirect(session.isAdmin ? '/dashboard' : session.isSystemInspector ? '/inspections' : '/my-profile')
 }

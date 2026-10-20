@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { DigitalInspectionForm } from '@/components/digital-inspection-form'
+import { requireUser, sessionRoleRows, sessionAgencyAccessRows } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Start Inspection' }
 type Props = { searchParams: Promise<{ vehicle?: string; error?: string }> }
@@ -11,11 +12,11 @@ type Props = { searchParams: Promise<{ vehicle?: string; error?: string }> }
 export default async function StartInspectionPage({ searchParams }: Props) {
   const qs = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   const [{ data: roles }, { data: accessRows }, { data: profile }] = await Promise.all([
-    supabase.from('user_roles').select('role').eq('user_id', user!.id),
-    supabase.from('user_agency_access').select('agency_id, can_manage_fleet').eq('user_id', user!.id),
-    supabase.from('profiles').select('display_name').eq('id', user!.id).maybeSingle(),
+    sessionRoleRows(),
+    sessionAgencyAccessRows(),
+    supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle(),
   ])
   const roleNames = new Set((roles ?? []).map((r:any)=>r.role))
   const isSystemAdmin = roleNames.has('system_admin')

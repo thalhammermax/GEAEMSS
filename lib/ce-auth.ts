@@ -1,33 +1,26 @@
 import 'server-only'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { requireSession } from '@/lib/session'
 
 export async function getCEContext() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const [{ data: profile }, { data: roles }] = await Promise.all([
-    supabase.from('profiles').select('provider_id, display_name, active').eq('id', user.id).maybeSingle(),
-    supabase.from('user_roles').select('role').eq('user_id', user.id),
-  ])
-  if (!profile || profile.active === false) redirect('/auth/disabled')
-
-  const roleNames = new Set((roles ?? []).map((r: any) => r.role))
-  const isSystemAdmin = roleNames.has('system_admin')
-  const isCECoordinator = roleNames.has('ce_coordinator')
-  const isCEInstructor = roleNames.has('ce_instructor')
+  const session = await requireSession()
+  const roleNames = new Set(session.roles)
+  const isSystemAdmin = session.isSystemAdmin
+  const isCECoordinator = session.isCECoordinator
+  const isCEInstructor = session.isCEInstructor
 
   return {
     supabase,
-    user,
-    profile,
+    user: session.user,
+    profile: { provider_id: session.providerId, display_name: session.displayName, active: session.active },
     roleNames,
     isSystemAdmin,
     isCECoordinator,
     isCEInstructor,
     canManageCE: isSystemAdmin || isCECoordinator,
-    providerId: profile.provider_id as string | null,
+    providerId: session.providerId,
   }
 }
 

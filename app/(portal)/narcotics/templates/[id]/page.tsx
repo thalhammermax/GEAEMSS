@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { formatQuantity } from '@/lib/narcotics'
 import { addNarcoticsTemplateItem, deleteNarcoticsTemplateItem, updateNarcoticsTemplate } from '../../actions'
+import { requireUser, sessionRoleRows, sessionAgencyAccessRows } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Narcotics Form' }
 type Props = { params: Promise<{ id:string }>; searchParams: Promise<{ error?:string; notice?:string }> }
@@ -15,11 +16,11 @@ export default async function TemplatePage({ params, searchParams }: Props) {
     supabase.from('narcotics_count_template_items').select('*').eq('template_id', id).order('sort_order').order('medication_name'),
   ])
   if (!template) notFound()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) redirect('/login')
   const [{ data: roles }, { data: access }] = await Promise.all([
-    supabase.from('user_roles').select('role').eq('user_id', user.id),
-    supabase.from('user_agency_access').select('agency_id, can_manage_narcotics').eq('user_id', user.id),
+    sessionRoleRows(),
+    sessionAgencyAccessRows(),
   ])
   const roleNames = new Set((roles ?? []).map((r:any) => r.role))
   const canManage = roleNames.has('system_admin') || (template.scope_type === 'agency' && (access ?? []).some((a:any) => a.agency_id === template.agency_id && a.can_manage_narcotics))

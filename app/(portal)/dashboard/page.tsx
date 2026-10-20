@@ -4,19 +4,21 @@ import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { StatCard } from '@/components/stat-card'
 import { AlertIcon, CheckIcon } from '@/components/icons'
-import { dateInTimeZone, relationOne } from '@/lib/narcotics'
-import { enabledModuleKeys, getModuleStates, moduleLabel } from '@/lib/modules'
+import { enabledModuleKeys, moduleLabel } from '@/lib/modules'
+import { requireSession } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Dashboard' }
 
-const emptyResult = () => Promise.resolve({ data: [] as any[], count: 0, error: null } as any)
-
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const moduleStates = await getModuleStates(supabase)
-  const activeAgencyResult = await supabase.from('agencies').select('id').eq('active', true)
-  const activeAgencyIds = (activeAgencyResult.data ?? []).map((agency: any) => agency.id)
-  const agencies = { data: activeAgencyResult.data ?? [], count: activeAgencyIds.length, error: activeAgencyResult.error }
+  const session = await requireSession()
+  const moduleStates = session.modules
+
+  // One round trip: every count is computed inside Postgres through the
+  // caller's row-level security (see migration 023, dashboard_summary()).
+  const { data: summary, error } = await supabase.rpc('dashboard_summary')
+  const firstError = error
+  const n = (key: string) => Number(summary?.[key] ?? 0)
 
   const personnelEnabled = moduleStates.personnel
   const credentialsEnabled = moduleStates.credentials
@@ -24,84 +26,29 @@ export default async function DashboardPage() {
   const inspectionsEnabled = moduleStates.inspections
   const narcoticsEnabled = moduleStates.narcotics
 
-  const [
-    providers,
-    vehicles,
-    pending,
-    expiredCredentials,
-    expiringCredentials,
-    missingCredentials,
-    overdueInspections,
-    dueInspections,
-    failedInspections,
-    missingInspections,
-    openDeficiencies,
-    expiringVehicleLicenses,
-    expiredVehicleLicenses,
-    missingVehicleLicenses,
-    narcoticsSettings,
-    narcoticsVehicles,
-  ] = await Promise.all([
-    personnelEnabled ? supabase.from('providers').select('*', { count: 'exact', head: true }) : emptyResult(),
-    fleetEnabled && activeAgencyIds.length ? supabase.from('vehicles').select('*', { count: 'exact', head: true }).eq('active', true).in('agency_id', activeAgencyIds) : emptyResult(),
-    credentialsEnabled ? supabase.from('credential_submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending') : emptyResult(),
-    credentialsEnabled ? supabase.from('provider_compliance').select('*', { count: 'exact', head: true }).eq('compliance_status', 'EXPIRED') : emptyResult(),
-    credentialsEnabled ? supabase.from('provider_compliance').select('*', { count: 'exact', head: true }).eq('compliance_status', 'EXPIRING_SOON') : emptyResult(),
-    credentialsEnabled ? supabase.from('provider_compliance').select('*', { count: 'exact', head: true }).eq('compliance_status', 'MISSING') : emptyResult(),
-    inspectionsEnabled && activeAgencyIds.length ? supabase.from('vehicle_inspection_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).eq('compliance_status', 'OVERDUE') : emptyResult(),
-    inspectionsEnabled && activeAgencyIds.length ? supabase.from('vehicle_inspection_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).eq('compliance_status', 'DUE_SOON') : emptyResult(),
-    inspectionsEnabled && activeAgencyIds.length ? supabase.from('vehicle_inspection_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).eq('compliance_status', 'FAILED') : emptyResult(),
-    inspectionsEnabled && activeAgencyIds.length ? supabase.from('vehicle_inspection_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).in('compliance_status', ['MISSING', 'SCHEDULE_MISSING']) : emptyResult(),
-    inspectionsEnabled ? supabase.from('vehicle_inspection_deficiencies').select('id, severity, vehicle_inspections(vehicles(active, agency_id))').eq('status', 'open').limit(10000) : emptyResult(),
-    fleetEnabled && activeAgencyIds.length ? supabase.from('vehicle_license_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).eq('compliance_status', 'EXPIRING_SOON') : emptyResult(),
-    fleetEnabled && activeAgencyIds.length ? supabase.from('vehicle_license_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).eq('compliance_status', 'EXPIRED') : emptyResult(),
-    fleetEnabled && activeAgencyIds.length ? supabase.from('vehicle_license_compliance').select('*', { count: 'exact', head: true }).in('agency_id', activeAgencyIds).eq('compliance_status', 'MISSING') : emptyResult(),
-    narcoticsEnabled && activeAgencyIds.length ? supabase.from('narcotics_agency_settings').select('agency_id, enabled, timezone').in('agency_id', activeAgencyIds) : emptyResult(),
-    narcoticsEnabled && activeAgencyIds.length ? supabase.from('vehicles').select('id, agency_id, unit_number, fleet_number, narcotics_count_required, agencies(name, short_name), vehicle_types(name, narcotics_template_id)').eq('active', true).in('agency_id', activeAgencyIds).eq('narcotics_count_required', true).order('unit_number') : emptyResult(),
-  ])
+  const providers = { count: n('providers') }
+  const agencies = { count: n('agencies') }
+  const vehicles = { count: n('vehicles') }
+  const pending = { count: n('pending_submissions') }
+  const expiredCredentials = { count: n('credentials_expired') }
+  const expiringCredentials = { count: n('credentials_expiring') }
+  const missingCredentials = { count: n('credentials_missing') }
+  const overdueInspections = { count: n('inspections_overdue') }
+  const dueInspections = { count: n('inspections_due_soon') }
+  const failedInspections = { count: n('inspections_failed') }
+  const missingInspections = { count: n('inspections_missing') }
+  const expiringVehicleLicenses = { count: n('licenses_expiring') }
+  const expiredVehicleLicenses = { count: n('licenses_expired') }
+  const missingVehicleLicenses = { count: n('licenses_missing') }
+  const openDeficiencyCount = n('deficiencies_open')
+  const criticalDeficiencyCount = n('deficiencies_critical')
+  const missingNarcotics: Array<{ vehicle_id: string; agency: string; unit: string; state: string }> = narcoticsEnabled ? (summary?.narcotics_missing ?? []) : []
 
-  const activeAgencySet = new Set(activeAgencyIds)
-  const activeDeficiencyRows = (openDeficiencies.data ?? []).filter((row: any) => {
-    const inspection = relationOne<any>(row.vehicle_inspections)
-    const vehicle = relationOne<any>(inspection?.vehicles)
-    return vehicle?.active === true && !!vehicle?.agency_id && activeAgencySet.has(vehicle.agency_id)
-  })
-  const openDeficiencyCount = activeDeficiencyRows.length
-  const criticalDeficiencyCount = activeDeficiencyRows.filter((row: any) => row.severity === 'critical').length
-
-  const narcoticsSettingMap = new Map((narcoticsSettings.data ?? []).map((setting: any) => [setting.agency_id, setting]))
-  const narcoticsRows = narcoticsEnabled
-    ? (narcoticsVehicles.data ?? []).map((vehicle: any) => {
-        const setting: any = narcoticsSettingMap.get(vehicle.agency_id)
-        const agency = relationOne<any>(vehicle.agencies)
-        const type = relationOne<any>(vehicle.vehicle_types)
-        return { ...vehicle, agency, type, localDate: dateInTimeZone(setting?.timezone || 'America/Chicago'), enabled: setting?.enabled !== false }
-      }).filter((row: any) => row.enabled)
-    : []
-
-  const narcoticsDates = [...new Set(narcoticsRows.map((row: any) => row.localDate))]
-  const narcoticsVehicleIds = narcoticsRows.map((row: any) => row.id)
-  const narcoticsCounts = narcoticsEnabled && narcoticsVehicleIds.length && narcoticsDates.length
-    ? await supabase.from('narcotics_counts').select('vehicle_id, count_date, status').in('vehicle_id', narcoticsVehicleIds).in('count_date', narcoticsDates)
-    : { data: [] as any[], error: null }
-
-  const submittedNarcotics = new Set((narcoticsCounts.data ?? []).filter((count: any) => count.status === 'submitted').map((count: any) => `${count.vehicle_id}|${count.count_date}`))
-  const draftNarcotics = new Set((narcoticsCounts.data ?? []).filter((count: any) => count.status === 'draft').map((count: any) => `${count.vehicle_id}|${count.count_date}`))
-  const missingNarcotics = narcoticsRows.filter((row: any) => !submittedNarcotics.has(`${row.id}|${row.localDate}`))
-
-  const results = [
-    providers, agencies, vehicles, pending, expiredCredentials, expiringCredentials, missingCredentials,
-    overdueInspections, dueInspections, failedInspections, missingInspections, openDeficiencies,
-    expiringVehicleLicenses, expiredVehicleLicenses, missingVehicleLicenses,
-    narcoticsSettings, narcoticsVehicles, narcoticsCounts,
-  ]
-  const firstError = results.find((result) => result.error)?.error
-
-  const personnelIssues = credentialsEnabled ? (expiredCredentials.count ?? 0) + (missingCredentials.count ?? 0) : 0
+  const personnelIssues = credentialsEnabled ? expiredCredentials.count + missingCredentials.count : 0
   const fleetCritical = fleetEnabled
-    ? (inspectionsEnabled ? (overdueInspections.count ?? 0) + (failedInspections.count ?? 0) : 0)
-      + (expiredVehicleLicenses.count ?? 0)
-      + (missingVehicleLicenses.count ?? 0)
+    ? (inspectionsEnabled ? overdueInspections.count + failedInspections.count : 0)
+      + expiredVehicleLicenses.count
+      + missingVehicleLicenses.count
     : 0
   const enabledNames = enabledModuleKeys(moduleStates).map(moduleLabel)
 
@@ -109,7 +56,7 @@ export default async function DashboardPage() {
     <PageHeader title="System Dashboard" description="Live status for the GEAEMS Portal modules currently enabled for production." />
     {firstError && <div className="banner danger"><AlertIcon/><div><strong>Some dashboard data could not be loaded.</strong><span>{firstError.message}</span></div></div>}
 
-    {narcoticsEnabled && missingNarcotics.length > 0 && <div className="banner danger narcotics-dashboard-alert"><AlertIcon/><div><strong>{missingNarcotics.length} daily narcotics count{missingNarcotics.length === 1 ? '' : 's'} incomplete</strong><span>{missingNarcotics.slice(0, 12).map((row: any) => `${row.agency?.short_name || row.agency?.name || 'Agency'} ${row.unit_number || row.fleet_number || 'Unnumbered'} — ${!row.type?.narcotics_template_id ? 'no form configured' : draftNarcotics.has(`${row.id}|${row.localDate}`) ? 'draft not submitted' : 'not started'}`).join(' • ')}{missingNarcotics.length > 12 ? ` • +${missingNarcotics.length - 12} more` : ''}</span><Link href="/narcotics">Open Narcotics Management →</Link></div></div>}
+    {narcoticsEnabled && missingNarcotics.length > 0 && <div className="banner danger narcotics-dashboard-alert"><AlertIcon/><div><strong>{missingNarcotics.length} daily narcotics count{missingNarcotics.length === 1 ? '' : 's'} incomplete</strong><span>{missingNarcotics.slice(0, 12).map((row) => `${row.agency} ${row.unit} — ${row.state}`).join(' • ')}{missingNarcotics.length > 12 ? ` • +${missingNarcotics.length - 12} more` : ''}</span><Link href="/narcotics">Open Narcotics Management →</Link></div></div>}
 
     {personnelEnabled && <section className="section-block">
       <div className="section-title"><div><span>Personnel</span><h2>{credentialsEnabled ? 'Provider & credential readiness' : 'Provider records'}</h2></div><span className="section-badge">{providers.count ?? 0} providers · {agencies.count ?? 0} agencies</span></div>

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { relationOne } from '@/lib/narcotics'
+import { requireUser, sessionRoleRows, sessionAgencyAccessRows } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Narcotics History' }
 
@@ -21,12 +22,12 @@ type Props = {
 export default async function NarcoticsHistoryPage({ searchParams }: Props) {
   const qs = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) redirect('/login')
 
   const [{ data: roles }, { data: access }] = await Promise.all([
-    supabase.from('user_roles').select('role').eq('user_id', user.id),
-    supabase.from('user_agency_access').select('agency_id').eq('user_id', user.id),
+    sessionRoleRows(),
+    sessionAgencyAccessRows(),
   ])
 
   const roleNames = new Set((roles ?? []).map((row: any) => row.role))

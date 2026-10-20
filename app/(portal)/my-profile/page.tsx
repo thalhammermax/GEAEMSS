@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { formatDate, titleCase } from '@/lib/format'
 import { fetchCustomFieldValues, fetchFieldDefinitions } from '@/lib/record-fields'
+import { requireUser } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'My Profile' }
 type Props = { searchParams: Promise<{ credentialNotice?: string }> }
@@ -33,7 +34,7 @@ function displayCustomValue(value: unknown) {
 export default async function MyProfilePage({ searchParams }: Props) {
   const qs = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('profiles').select('provider_id').eq('id', user.id).maybeSingle()

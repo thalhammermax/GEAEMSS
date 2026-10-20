@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { inviteProviderUser } from './actions'
 import { formatDateTime } from '@/lib/format'
+import { requireUser, sessionSystemAdminRole } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'User Management' }
 type Props = { searchParams: Promise<{ error?: string; notice?: string }> }
@@ -13,9 +14,9 @@ type Props = { searchParams: Promise<{ error?: string; notice?: string }> }
 export default async function UsersPage({ searchParams }: Props) {
   const { error, notice } = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) redirect('/login')
-  const { data: systemRole } = await supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role','system_admin').maybeSingle()
+  const { data: systemRole } = await sessionSystemAdminRole()
   if (!systemRole) redirect('/dashboard')
 
   let authUsers: any[] = []

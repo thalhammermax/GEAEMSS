@@ -1,18 +1,11 @@
 import 'server-only'
 import { createClient } from '@/lib/supabase/server'
+import { getSessionContext } from '@/lib/session'
 
 export async function requireSystemAdmin() {
   const supabase = await createClient()
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  if (userError || !user) throw new Error('Authentication required.')
-
-  const { data: role, error: roleError } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('role', 'system_admin')
-    .maybeSingle()
-
-  if (roleError || !role) throw new Error('System Administrator access is required.')
-  return { supabase, user }
+  const session = await getSessionContext()
+  if (!session) throw new Error('Authentication required.')
+  if (!session.active || !session.isSystemAdmin) throw new Error('System Administrator access is required.')
+  return { supabase, user: session.user }
 }

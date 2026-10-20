@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header'
 import { createClient } from '@/lib/supabase/server'
 import { normalizeInspectionPdfSettings } from '@/lib/inspection-pdf-settings'
 import { resetInspectionPdfTemplate, saveInspectionPdfTemplate } from './actions'
+import { requireUser, sessionSystemAdminRole } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Inspection PDF Template' }
 type Props = { searchParams: Promise<{ notice?: string; error?: string }> }
@@ -12,11 +13,11 @@ type Props = { searchParams: Promise<{ notice?: string; error?: string }> }
 export default async function InspectionPdfTemplatePage({ searchParams }: Props) {
   const qs = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) redirect('/login')
 
   const [{ data: role }, { data: row, error }] = await Promise.all([
-    supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'system_admin').maybeSingle(),
+    sessionSystemAdminRole(),
     supabase.from('inspection_pdf_template_settings').select('*').eq('id', 'system').maybeSingle(),
   ])
   if (!role) redirect('/inspections')

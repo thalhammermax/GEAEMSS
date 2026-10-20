@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { CredentialSubmissionForm, type CredentialSubmissionType } from '@/components/credential-submission-form'
 import { formatDate, titleCase } from '@/lib/format'
+import { requireUser } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Credential Submission' }
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string }> }
@@ -13,7 +14,7 @@ export default async function ProviderCredentialSubmissionPage({ params, searchP
   const { id } = await params
   const { saved } = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) redirect('/login')
   const { data: profile } = await supabase.from('profiles').select('provider_id').eq('id', user.id).maybeSingle()
   if (!profile?.provider_id) redirect('/auth/disabled')

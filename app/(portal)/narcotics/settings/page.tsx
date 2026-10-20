@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { saveNarcoticsAgencySettings, saveNarcoticsVehicleTypeTemplate } from '../actions'
 import { formatHour24 } from '@/lib/format'
+import { requireUser, sessionRoleRows, sessionAgencyAccessRows } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Narcotics Settings' }
 type Props = { searchParams: Promise<{ error?: string; notice?: string }> }
@@ -12,7 +13,7 @@ type Props = { searchParams: Promise<{ error?: string; notice?: string }> }
 export default async function NarcoticsSettingsPage({ searchParams }: Props) {
   const qs = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) redirect('/login')
 
   const [
@@ -23,11 +24,11 @@ export default async function NarcoticsSettingsPage({ searchParams }: Props) {
     { data: access },
     { data: vehicleTypes },
   ] = await Promise.all([
-    supabase.from('user_roles').select('role').eq('user_id', user.id),
+    sessionRoleRows(),
     supabase.from('agencies').select('id, name, short_name').eq('active', true).order('name'),
     supabase.from('narcotics_agency_settings').select('*'),
     supabase.from('narcotics_count_templates').select('id, name, scope_type, agency_id, active').eq('active', true).order('name'),
-    supabase.from('user_agency_access').select('agency_id, can_manage_narcotics').eq('user_id', user.id),
+    sessionAgencyAccessRows(),
     supabase.from('vehicle_types').select('id, code, name, narcotics_template_id').eq('active', true).order('sort_order').order('name'),
   ])
 

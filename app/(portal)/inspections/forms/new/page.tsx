@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { createAgencyInspectionForm } from '../actions'
+import { requireUser, sessionRoleRows, sessionAgencyAccessRows } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'New Agency Inspection Form' }
 type Props = { searchParams: Promise<{ error?: string }> }
@@ -11,12 +12,12 @@ type Props = { searchParams: Promise<{ error?: string }> }
 export default async function NewAgencyInspectionFormPage({ searchParams }: Props) {
   const qs = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) redirect('/login')
 
   const [{ data: roles }, { data: accessRows }, { data: vehicleTypes }] = await Promise.all([
-    supabase.from('user_roles').select('role').eq('user_id', user.id),
-    supabase.from('user_agency_access').select('agency_id, can_manage_fleet').eq('user_id', user.id),
+    sessionRoleRows(),
+    sessionAgencyAccessRows(),
     supabase.from('vehicle_types').select('id, code, name').eq('active', true).order('sort_order').order('name'),
   ])
 

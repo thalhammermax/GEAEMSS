@@ -1,13 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { buildInspectionPdf } from '@/lib/inspection-pdf'
 import { normalizeInspectionPdfSettings } from '@/lib/inspection-pdf-settings'
+import { requireUser } from '@/lib/session'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) return new Response('Authentication required.', { status: 401 })
 
   const { data: role } = await supabase

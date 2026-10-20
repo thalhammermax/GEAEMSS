@@ -4,15 +4,16 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { formatDate, titleCase } from '@/lib/format'
+import { requireUser, sessionRoleRows, sessionAgencyAccessRows } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Inspections' }
 
 export default async function InspectionsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   const [{ data: roles }, { data: accessRows }, { data: inspections, error }, { data: deficiencies }] = await Promise.all([
-    supabase.from('user_roles').select('role').eq('user_id', user!.id),
-    supabase.from('user_agency_access').select('agency_id, can_manage_fleet').eq('user_id', user!.id),
+    sessionRoleRows(),
+    sessionAgencyAccessRows(),
     supabase.from('vehicle_inspections').select('id, inspection_date, workflow_status, result, next_due_date, inspector_name, vehicles(active, agency_id, unit_number, fleet_number, agencies(short_name, name, active)), inspection_types(name), inspection_form_versions(inspection_form_templates(scope_type, agency_id))').order('created_at', { ascending: false }).limit(200),
     supabase.from('vehicle_inspection_deficiencies').select('id, description, severity, status, correction_due_date, vehicle_inspections(vehicles(active, agencies(active)))').eq('status', 'open').order('correction_due_date', { ascending: true }).limit(100),
   ])

@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/page-header'
 import { NarcoticsSealFields } from '@/components/narcotics-seal-fields'
 import { dateInTimeZone, formatQuantity, relationOne } from '@/lib/narcotics'
 import { saveNarcoticsCount } from '../../actions'
+import { requireUser } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Daily Narcotics Count' }
 type Props = { params: Promise<{ vehicleId: string }>; searchParams: Promise<{ error?: string; saved?: string }> }
@@ -21,7 +22,7 @@ export default async function NarcoticsCountPage({ params, searchParams }: Props
     .maybeSingle()
   if (!vehicle || !vehicle.narcotics_count_required) notFound()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) return null
   const { data: profile } = await supabase.from('profiles').select('provider_id').eq('id', user.id).maybeSingle()
   const { data: membership } = profile?.provider_id

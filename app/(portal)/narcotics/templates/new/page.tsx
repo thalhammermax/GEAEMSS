@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { createNarcoticsTemplate } from '../../actions'
+import { requireUser, sessionSystemAdminRole } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'New Narcotics Form' }
 type Props = { searchParams: Promise<{ error?: string }> }
@@ -11,9 +12,9 @@ type Props = { searchParams: Promise<{ error?: string }> }
 export default async function NewTemplatePage({ searchParams }: Props) {
   const qs = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) redirect('/login')
-  const { data: role } = await supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'system_admin').maybeSingle()
+  const { data: role } = await sessionSystemAdminRole()
   if (!role) redirect('/narcotics')
 
   return <>

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { DigitalInspectionForm } from '@/components/digital-inspection-form'
 import { formatDate, titleCase } from '@/lib/format'
+import { requireUser, sessionRoleRows, sessionAgencyAccessRows } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Vehicle Inspection' }
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; saved?: string; submitted?: string }> }
@@ -13,10 +14,10 @@ export default async function InspectionPage({ params, searchParams }: Props) {
   const { id } = await params
   const qs = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   const [{ data: roles }, { data: accessRows }] = await Promise.all([
-    supabase.from('user_roles').select('role').eq('user_id', user!.id),
-    supabase.from('user_agency_access').select('agency_id, can_manage_fleet').eq('user_id', user!.id),
+    sessionRoleRows(),
+    sessionAgencyAccessRows(),
   ])
   const roleNames = new Set((roles ?? []).map((r:any)=>r.role))
   const isSystemAdmin = roleNames.has('system_admin')

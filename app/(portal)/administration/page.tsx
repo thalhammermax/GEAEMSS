@@ -3,12 +3,13 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { getModuleStates } from '@/lib/modules'
+import { requireUser, sessionRoleRows } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Administration' }
 
 export default async function AdministrationPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   const [agencies, levels, statuses, vehicleTypes, inspectionTypes, fields, users, credentialTypes, roles, moduleStates] = await Promise.all([
     supabase.from('agencies').select('id, name, short_name, active').order('name'),
     supabase.from('provider_levels').select('*', { count: 'exact', head: true }),
@@ -18,7 +19,7 @@ export default async function AdministrationPage() {
     supabase.from('record_field_definitions').select('*', { count: 'exact', head: true }).eq('source_type', 'custom'),
     supabase.from('profiles').select('*', { count: 'exact', head: true }),
     supabase.from('credential_types').select('*', { count: 'exact', head: true }),
-    user ? supabase.from('user_roles').select('role').eq('user_id', user.id) : Promise.resolve({ data: [] } as any),
+    user ? sessionRoleRows() : Promise.resolve({ data: [] } as any),
     getModuleStates(supabase),
   ])
 

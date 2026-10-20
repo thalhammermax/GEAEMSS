@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { requireUser } from '@/lib/session'
 
 function value(formData: FormData, key: string) {
   const v = formData.get(key)
@@ -30,7 +31,7 @@ export async function requestCredentialChanges(formData: FormData) {
   if (!id) fail('/credentials/submissions', 'Submission ID is missing.')
   if (!notes) fail(`/credentials/submissions/${id}`, 'Explain what the provider needs to change.')
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) fail('/login', 'Please sign in again.')
   const { error } = await supabase.from('credential_submissions').update({
     status: 'changes_requested', reviewed_by: user.id, reviewed_at: new Date().toISOString(), review_notes: notes,

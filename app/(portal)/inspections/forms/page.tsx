@@ -3,17 +3,18 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
+import { requireUser, sessionRoleRows, sessionAgencyAccessRows } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Inspection Forms' }
 
 export default async function InspectionFormsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await requireUser()
   if (!user) redirect('/login')
 
   const [{ data: roles }, { data: access }, { data: templates, error }, { data: versions }] = await Promise.all([
-    supabase.from('user_roles').select('role').eq('user_id', user.id),
-    supabase.from('user_agency_access').select('agency_id, can_manage_fleet').eq('user_id', user.id),
+    sessionRoleRows(),
+    sessionAgencyAccessRows(),
     supabase.from('inspection_form_templates').select('id, code, name, description, scope_type, agency_id, active, vehicle_types(name, code), inspection_types(name), agencies(name, short_name)').order('name'),
     supabase.from('inspection_form_versions').select('id, template_id, version_number, status, published_at').order('version_number', { ascending: false }),
   ])

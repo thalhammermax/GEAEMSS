@@ -1,5 +1,9 @@
 'use client'
 
+// NOTE: this is the only remaining component that talks to Supabase directly
+// from the browser (Storage upload + submission rows). On networks that block
+// *.supabase.co it will fail; see README → Network accessibility before enabling
+// the Credentials module.
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'

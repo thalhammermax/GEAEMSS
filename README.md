@@ -1,9 +1,76 @@
-# GEAEMS Portal v0.10.3
+# GEAEMS Portal v0.11.0
 
 v0.10 adds staged **module rollout controls** and **multi-module reporting**. The initial production configuration enables Fleet, Inspections, and Reports while Personnel, Credentials, CE Tracking, and Narcotics remain disabled until GEAEMS is ready to roll them out.
 
 Production portal: `https://portal.geaemss.org`
 
+
+## New in v0.11.0 — Performance & network-accessibility release
+
+This release changes no features. It makes every page load faster and makes the portal reachable from restrictive networks (hospital Wi-Fi/LAN) by ensuring the **browser only ever talks to `portal.geaemss.org`**.
+
+### What changed
+
+**Authentication plumbing (biggest speed win)**
+
+- The proxy (middleware) now verifies the session token locally with `getClaims()` instead of calling the Supabase Auth server with `getUser()` on every request. (Requires the project's JWT signing keys to be asymmetric — see *Deploy* below.)
+- Roles, profile, agency access and module rollout state are loaded with **one** database call (`get_session_context()`, migration 023) and forwarded from the proxy to the page render. Previously the proxy, the portal layout and most pages each re-queried `user_roles` / `profiles` / `system_module_settings` separately (6–9 round trips per page).
+- `createClient()` and `getModuleStates()` are memoized per request, so helpers that call them repeatedly no longer repeat work.
+- `lib/session.ts` provides `requireSession()` / `requireUser()`; pages use these instead of `supabase.auth.getUser()`.
+
+**Database (migration 023)**
+
+- `is_system_admin()` and `has_agency_access()` do one indexed lookup instead of two to three.
+- Administrator **fast-path RLS policies** (`_fast_system_admin_read`) on every data table. They are evaluated once per statement, so System Administrators no longer pay for the per-row `can_view_*()` helper chain. Agency administrators get an equivalent hashed fast path on `agencies` and `vehicles`.
+- `dashboard_summary()` computes all dashboard counts in one call (was 17 separate count queries).
+- Supporting indexes for the hottest list screens.
+
+**Server-side sign-in / sign-out / password setup**
+
+- Sign-in, sign-out and invite/recovery password setup now run as Next.js server actions. The browser never loads the Supabase JavaScript client or contacts `*.supabase.co` for these flows.
+- Instant route-level loading skeleton (`app/(portal)/loading.tsx`) so navigation never appears frozen.
+
+The only remaining browser-to-Supabase traffic is the provider credential **document upload** in the Credentials module (currently disabled). See *Network accessibility* below before enabling that module.
+
+### Database migration
+
+If migrations `001` through `022` are already installed, run only:
+
+```text
+supabase/migrations/023_performance_session_and_dashboard.sql
+```
+
+The application tolerates the migration not being applied yet (it falls back to the old query pattern), but it will not be faster until it is.
+
+### Deploy
+
+1. Run migration 023 in the Supabase SQL Editor.
+2. Supabase Dashboard → **Project Settings → JWT Keys** → if the project still uses the legacy HS256 shared secret, choose **Migrate to asymmetric JWT signing** (zero-downtime; existing sessions keep working). Without this step `getClaims()` silently falls back to a network call and the proxy is no faster than before.
+3. Supabase Dashboard → **Authentication → Email Templates** → change the *Invite user* and *Reset password* templates so the link goes to the portal instead of Supabase (required for the server-side password setup, and so the link works on networks that block `supabase.co`):
+
+   ```html
+   <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next={{ .RedirectTo }}">Set up your GEAEMS Portal password</a>
+   ```
+
+   (use `type=recovery` in the reset-password template). Confirm **Authentication → URL Configuration → Site URL** is `https://portal.geaemss.org` and that `https://portal.geaemss.org/auth/confirm` and `https://portal.geaemss.org/auth/setup-password` are listed under *Redirect URLs*.
+4. Commit and deploy from GitHub. No new environment variables are required.
+5. Smoke test: sign in, open Dashboard / Fleet / Inspections, sign out, and send one password-setup email to a test account.
+
+### Network accessibility (hospital networks)
+
+Hospital web filters typically block in one of two places, and both must be clear:
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `portal.geaemss.org` itself will not load (block page or timeout) | The domain is uncategorized / "newly registered" in the hospital's web filter (Zscaler, Palo Alto, Cisco Umbrella, Fortinet, etc.) | Ask hospital IT to allow-list `portal.geaemss.org`, and submit the domain for categorization as *Business / Healthcare* with the filter vendor. |
+| Login page loads but **Sign in** hangs or fails | The browser was calling `<project>.supabase.co` directly | Fixed in v0.11.0 — sign-in now goes through the portal's own server. |
+| Invite / reset-password email links fail | Default Supabase email links point at `<project>.supabase.co` | Update the email templates as described in *Deploy* step 3. |
+
+If the Credentials module is enabled later, provider document uploads still go browser → Supabase Storage. Options at that point: (a) add a **Supabase custom domain** (e.g. `api.geaemss.org`, Pro-plan add-on) so that traffic stays under the allow-listed `geaemss.org` domain, or (b) route uploads through a server action (limited to ~4–6 MB per file on Netlify/Vercel).
+
+### Hosting
+
+Netlify + Supabase is a reasonable production stack and is **not** the cause of the hospital block. If page loads still feel slow after this release, the remaining cost is serverless cold starts; the lowest-friction upgrade is **Vercel** (native Next.js host, Fluid Compute reduces cold starts, same GitHub workflow, same environment variables). Whichever host is used, keep the custom domain and the `/auth/confirm` email-link setup above.
 
 ## New in v0.10.3 — Narcotics requirement checkbox fix
 
